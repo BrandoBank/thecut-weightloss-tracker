@@ -1,0 +1,2796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="The Cut">
+<meta name="theme-color" content="#0a0a0a">
+<title>The Cut — Food Tracker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%94%A5%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #0a0a0a; color: #f5f5f5; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+body { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); min-height: 100vh; font-size: 15px; line-height: 1.4; }
+.display { font-family: ui-serif, "New York", Georgia, serif; font-weight: 800; letter-spacing: -0.02em; }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+button { font-family: inherit; background: none; border: none; color: inherit; cursor: pointer; padding: 0; }
+input, textarea { font-family: inherit; color: inherit; background: transparent; border: none; outline: none; }
+textarea { resize: none; }
+input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+.grain { background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0); background-size: 24px 24px; }
+.hscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.hscroll::-webkit-scrollbar { display: none; }
+
+.wrap { padding-bottom: 120px; }
+.row { display: flex; align-items: center; }
+.col { display: flex; flex-direction: column; }
+.between { justify-content: space-between; }
+.gap-1 { gap: 4px; } .gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .gap-4 { gap: 16px; }
+.px-5 { padding-left: 20px; padding-right: 20px; }
+.mt-2 { margin-top: 8px; } .mt-3 { margin-top: 12px; } .mt-4 { margin-top: 16px; } .mt-5 { margin-top: 20px; } .mt-6 { margin-top: 24px; }
+.mb-1 { margin-bottom: 4px; } .mb-2 { margin-bottom: 8px; } .mb-3 { margin-bottom: 12px; } .mb-4 { margin-bottom: 16px; }
+.flex1 { flex: 1; min-width: 0; }
+.shrink0 { flex-shrink: 0; }
+.hidden { display: none !important; }
+.space-y-2 > * + * { margin-top: 8px; }
+.space-y-3 > * + * { margin-top: 12px; }
+.space-y-4 > * + * { margin-top: 16px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.grid4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; }
+.center { align-items: center; justify-content: center; }
+
+.tiny { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #737373; }
+.small { font-size: 11px; }
+.muted { color: #737373; }
+.dim { color: #a3a3a3; }
+.lime { color: #d4ff3f; }
+.red { color: #ff5a4a; }
+.amber { color: #fbbf24; }
+.blue { color: #60a5fa; }
+.orange { color: #fb923c; }
+.cyan { color: #22d3ee; }
+.green { color: #86efac; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+h1, h2, h3 { margin: 0; }
+h1 { font-size: 28px; }
+h2 { font-size: 20px; }
+h3 { font-size: 20px; }
+
+.header { padding: 24px 20px 12px; display: flex; justify-content: space-between; align-items: center; }
+.header-btns { display: flex; gap: 8px; }
+.iconbtn { width: 36px; height: 36px; border-radius: 999px; background: #171717; border: 1px solid #262626; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
+.iconbtn:active { transform: scale(0.92); }
+
+.datenav { padding: 0 20px 12px; display: flex; align-items: center; justify-content: center; gap: 12px; }
+.datenav-btn { padding: 8px; border-radius: 8px; color: #737373; transition: color 0.15s, transform 0.1s; }
+.datenav-btn:active { color: #d4ff3f; transform: scale(0.9); }
+.datenav-btn:disabled { opacity: 0.3; }
+.datenav-label { font-size: 13px; font-weight: 600; color: #d4d4d4; min-width: 140px; text-align: center; }
+.today-btn { padding: 4px 10px; border: 1px solid #262626; background: #171717; border-radius: 999px; font-size: 11px; font-weight: 600; color: #a3a3a3; letter-spacing: 0.05em; }
+.today-btn:active { background: #262626; }
+
+.card { border: 1px solid #262626; background: rgba(23,23,23,0.4); border-radius: 16px; overflow: hidden; }
+.card-pad { padding: 16px; }
+
+.banner { margin: 0 20px 16px; padding: 14px; border-radius: 12px; border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.05); }
+.banner-reminder { margin: 0 20px 12px; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(34,211,238,0.3); background: rgba(34,211,238,0.05); display: flex; gap: 10px; align-items: center; font-size: 13px; color: #bef264; }
+.banner-reminder button { margin-left: auto; color: #22d3ee; padding: 4px; }
+.banner-buttons { display: flex; gap: 8px; margin-top: 12px; }
+.banner-btn { padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; border: 1px solid rgba(245,158,11,0.4); color: #fcd34d; transition: transform 0.1s; display: flex; align-items: center; gap: 6px; }
+.banner-btn:active { transform: scale(0.96); }
+.banner-btn.committed { background: rgba(245,158,11,0.15); color: #fde68a; }
+
+.ring-wrap { position: relative; }
+.ring-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.macro-bar-bg { height: 6px; background: #171717; border-radius: 999px; overflow: hidden; }
+.macro-bar-fg { height: 100%; border-radius: 999px; transition: width 0.5s; }
+
+.progress-bg { position: relative; height: 8px; background: #262626; border-radius: 999px; overflow: hidden; }
+.progress-fg { position: absolute; inset: 0 auto 0 0; border-radius: 999px; transition: width 0.7s; }
+
+.log-item { padding: 12px; display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; transition: background 0.15s; }
+.log-item:active { background: rgba(38,38,38,0.5); }
+.empty-state { border: 2px dashed #262626; border-radius: 16px; padding: 32px; text-align: center; }
+
+.cat-header { display: flex; align-items: center; gap: 8px; padding: 12px 4px 6px; }
+.cat-dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
+.cat-name { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; }
+.cat-total { font-size: 11px; color: #737373; font-family: ui-monospace, monospace; margin-left: auto; }
+
+.water-card { padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+.water-info { flex: 1; }
+.water-btns { display: flex; gap: 6px; }
+.water-btn { width: 36px; height: 36px; border-radius: 999px; background: rgba(34,211,238,0.1); border: 1px solid rgba(34,211,238,0.3); color: #22d3ee; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
+.water-btn:active { transform: scale(0.9); }
+.water-btn.plus { background: rgba(34,211,238,0.2); }
+
+.fab { position: fixed; bottom: 24px; right: 20px; z-index: 20; width: 56px; height: 56px; border-radius: 999px; background: #d4ff3f; color: #0a0a0a; display: flex; align-items: center; justify-content: center; box-shadow: 0 20px 40px -10px rgba(212,255,63,0.4); transition: transform 0.1s; font-weight: 700; }
+.fab:active { transform: scale(0.95); }
+.anchor-btn { position: fixed; bottom: 30px; left: 20px; z-index: 20; width: 44px; height: 44px; border-radius: 999px; background: linear-gradient(135deg, rgba(251,146,60,0.2), rgba(251,146,60,0.1)); color: #fb923c; border: 1px solid rgba(251,146,60,0.35); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: transform 0.1s; }
+.anchor-btn:active { transform: scale(0.9); }
+
+.overlay { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: flex; align-items: flex-end; justify-content: center; }
+@media (min-width: 640px) { .overlay { align-items: center; } }
+.sheet { width: 100%; max-width: 480px; max-height: 92vh; background: #0a0a0a; border-top: 1px solid #262626; border-radius: 16px 16px 0 0; display: flex; flex-direction: column; overflow: hidden; }
+@media (min-width: 640px) { .sheet { border: 1px solid #262626; border-radius: 16px; } }
+.sheet-head { padding: 20px 20px 12px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.sheet-body { padding: 0 20px 20px; overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; }
+
+.tabs { display: flex; gap: 2px; padding: 3px; background: #171717; border-radius: 12px; }
+.tab { flex: 1; padding: 7px 2px; border-radius: 8px; font-size: 10px; font-weight: 600; color: #737373; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.15s; min-width: 0; }
+.tab.active { background: #262626; color: #d4ff3f; }
+
+.segments { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px; padding: 4px; background: #171717; border-radius: 12px; }
+.seg { padding: 8px 4px; border-radius: 8px; font-size: 11px; font-weight: 600; color: #737373; transition: all 0.15s; }
+.seg.active { background: #262626; color: #f5f5f5; }
+
+.chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 6px 12px; border-radius: 999px; border: 1px solid #262626; background: #171717; font-size: 12px; font-weight: 500; color: #a3a3a3; transition: all 0.15s; }
+.chip.active { background: rgba(245,158,11,0.15); border-color: rgba(245,158,11,0.4); color: #fde68a; }
+
+.field { background: #171717; border: 1px solid #262626; border-radius: 12px; padding: 12px 16px; width: 100%; font-size: 16px; color: #f5f5f5; transition: border-color 0.15s; }
+.field:focus { border-color: rgba(212,255,63,0.5); }
+.field-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: #737373; display: block; margin-bottom: 6px; }
+.field-wrap { position: relative; }
+.field-suffix { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #737373; font-size: 12px; pointer-events: none; }
+.field-wrap .field { padding-right: 40px; }
+
+.btn { padding: 14px; border-radius: 12px; font-weight: 600; text-align: center; width: 100%; transition: transform 0.1s, opacity 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; }
+.btn-primary { background: #d4ff3f; color: #0a0a0a; }
+.btn-secondary { background: #262626; color: #f5f5f5; }
+.btn-danger { background: rgba(255,90,74,0.1); color: #ff8a80; border: 1px solid rgba(255,90,74,0.3); }
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.4; }
+
+.pill { flex-shrink: 0; padding: 8px 12px; border-radius: 999px; border: 1px solid #262626; background: rgba(23,23,23,0.6); text-align: left; transition: transform 0.1s; }
+.pill:active { transform: scale(0.95); border-color: rgba(212,255,63,0.5); }
+
+.result { width: 100%; text-align: left; border: 1px solid #262626; background: rgba(23,23,23,0.5); border-radius: 12px; padding: 12px; transition: border-color 0.15s, transform 0.1s; }
+.result:active { border-color: rgba(212,255,63,0.5); transform: scale(0.99); }
+
+.photo-btn { width: 100%; padding: 24px; border: 2px dashed #262626; border-radius: 12px; color: #a3a3a3; display: flex; flex-direction: column; align-items: center; gap: 8px; transition: transform 0.1s; }
+.photo-btn:active { transform: scale(0.98); }
+
+.photo-thumb { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; border: 1px solid #262626; background: #171717; transition: transform 0.1s; }
+.photo-thumb:active { transform: scale(0.97); }
+.photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-thumb-label { position: absolute; bottom: 0; left: 0; right: 0; padding: 4px 8px; background: linear-gradient(transparent, rgba(0,0,0,0.8)); font-size: 10px; font-family: ui-monospace, monospace; color: #f5f5f5; }
+.photo-thumb-sel { position: absolute; top: 6px; right: 6px; width: 20px; height: 20px; border-radius: 999px; background: rgba(0,0,0,0.5); border: 1.5px solid #d4ff3f; display: flex; align-items: center; justify-content: center; color: #d4ff3f; }
+
+.warn { margin-top: 12px; padding: 12px; border-radius: 12px; border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.05); font-size: 12px; color: #fcd34d; line-height: 1.4; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }
+@keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.fadein { animation: fadein 0.4s ease-out; }
+
+.welcome { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.welcome-inner { max-width: 440px; width: 100%; }
+
+.error { margin-top: 12px; font-size: 13px; color: #ff8a80; line-height: 1.4; }
+
+.subsection-head { display: flex; align-items: center; justify-content: space-between; margin: 24px 0 12px; padding: 0 20px; }
+.add-btn-sm { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: #171717; border: 1px solid #262626; font-size: 11px; font-weight: 600; color: #d4d4d4; transition: transform 0.1s; }
+.add-btn-sm:active { transform: scale(0.95); border-color: rgba(212,255,63,0.5); }
+
+/* Break glass modal */
+.bg-content { padding: 40px 24px; text-align: center; }
+.bg-hero { font-size: 56px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; color: #d4ff3f; margin: 8px 0; font-family: ui-serif, serif; }
+.bg-stat { margin: 24px 0; }
+.bg-stat-val { font-size: 32px; font-weight: 700; line-height: 1; }
+.bg-stat-label { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: #737373; margin-top: 4px; }
+.bg-line { height: 1px; background: #262626; margin: 20px 0; }
+
+/* Weekly review */
+.wr-day { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid #262626; background: rgba(23,23,23,0.4); }
+.wr-dot { width: 10px; height: 10px; border-radius: 999px; }
+
+svg { display: inline-block; vertical-align: middle; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+// =====================
+// ICONS
+// =====================
+const ICONS = {
+  plus: 'M5 12h14M12 5v14',
+  x: 'M18 6 6 18M6 6l12 12',
+  minus: 'M5 12h14',
+  check: 'M20 6 9 17l-5-5',
+  settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z|M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z',
+  search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z|M21 21l-4.35-4.35',
+  camera: 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z|M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
+  edit: 'M12 20h9|M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z',
+  history: 'M3 12a9 9 0 1 0 3-6.7L3 8|M3 3v5h5|M12 7v5l4 2',
+  sparkles: 'M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z',
+  trash: 'M3 6h18|M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6|M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2',
+  alert: 'M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4|M12 17h.01',
+  trend: 'M22 17 13.5 8.5l-5 5L2 7|M16 17h6v-6',
+  scale: 'M6.5 6.5h11M8.5 6.5a2.5 2.5 0 0 1 5 0|M6.5 6.5h11L22 13H2z|M2 13l3 8h14l3-8',
+  flame: 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z',
+  trophy: 'M6 9H4.5a2.5 2.5 0 0 1 0-5H6|M18 9h1.5a2.5 2.5 0 0 0 0-5H18|M4 22h16|M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22|M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22|M18 2H6v7a6 6 0 0 0 12 0V2z',
+  key: 'm21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4',
+  zap: 'M13 2 3 14h9l-1 8 10-12h-9l1-8z',
+  wheat: 'M2 22 16 8|M3.47 12.53 5.5 10.5l1.414 1.414a2 2 0 0 1 0 2.829L5.5 16.172 3.47 14.142a2 2 0 0 1 0-2.829z|M7.47 8.53 9.5 6.5l1.414 1.414a2 2 0 0 1 0 2.829L9.5 12.172 7.47 10.142a2 2 0 0 1 0-2.829z',
+  droplet: 'M12 2.69 5.64 9.05A7 7 0 0 0 12 21a7 7 0 0 0 6.36-11.95z',
+  loader: 'M21 12a9 9 0 1 1-6.219-8.56',
+  chevronL: 'M15 18l-6-6 6-6',
+  chevronR: 'M9 18l6-6-6-6',
+  note: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M16 13H8|M16 17H8|M10 9H8',
+  fire: 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z',
+  shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+  chart: 'M3 3v18h18|M7 14l4-4 4 4 5-5',
+  image: 'M21 15V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4z|M8.5 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z|M21 15l-5-5L5 21',
+  target: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12z|M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+  journal: 'M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14l2 2v12a2 2 0 0 1-2 2z|M12 12l5-5M8 6h3|M8 10h3|M8 14h8|M8 18h8',
+};
+function icon(name, size = 16, color = 'currentColor', sw = 2, cls = '') {
+  const paths = (ICONS[name] || '').split('|').map(d => `<path d="${d}"/>`).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" class="${cls}">${paths}</svg>`;
+}
+
+// =====================
+// SUPABASE CONFIG
+// =====================
+const SUPABASE_URL = 'YOUR_SUPABASE_PROJECT_URL';       // e.g. https://xxxxxxxxxxxx.supabase.co
+const SUPABASE_KEY = 'YOUR_SUPABASE_PUBLISHABLE_KEY';   // anon/public key from Project Settings → API
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, storage: window.localStorage }
+});
+
+// =====================
+// CATEGORIES
+// =====================
+const CATEGORIES = {
+  breakfast: { label: 'Breakfast', color: '#fb923c', order: 0 },
+  lunch: { label: 'Lunch', color: '#fbbf24', order: 1 },
+  dinner: { label: 'Dinner', color: '#a78bfa', order: 2 },
+  snack: { label: 'Snack', color: '#737373', order: 3 },
+};
+const TRIGGERS = ['Stress', 'Poor sleep', 'Weekend', 'Travel', 'Social event', 'Boredom', 'Hunger', 'Emotional'];
+
+const DEFAULT_CONDIMENTS = [
+  { name: 'Olive oil (1 tbsp)', calories: 120, protein: 0, carbs: 0, fat: 14 },
+  { name: 'Butter (1 tbsp)', calories: 102, protein: 0, carbs: 0, fat: 12 },
+  { name: 'Mayonnaise (1 tbsp)', calories: 94, protein: 0, carbs: 0, fat: 10 },
+  { name: 'Ranch dressing (2 tbsp)', calories: 140, protein: 1, carbs: 2, fat: 14 },
+  { name: 'Ketchup (1 tbsp)', calories: 17, protein: 0, carbs: 4, fat: 0 },
+  { name: 'BBQ sauce (2 tbsp)', calories: 58, protein: 0, carbs: 14, fat: 0 },
+  { name: 'Mustard (1 tsp)', calories: 3, protein: 0, carbs: 0, fat: 0 },
+  { name: 'Sriracha (1 tsp)', calories: 5, protein: 0, carbs: 1, fat: 0 },
+  { name: 'Hot sauce (1 tsp)', calories: 1, protein: 0, carbs: 0, fat: 0 },
+  { name: 'Soy sauce (1 tbsp)', calories: 9, protein: 1, carbs: 1, fat: 0 },
+  { name: 'Honey mustard (2 tbsp)', calories: 100, protein: 0, carbs: 11, fat: 6 },
+  { name: 'Caesar dressing (2 tbsp)', calories: 158, protein: 1, carbs: 1, fat: 17 },
+  { name: 'Italian dressing (2 tbsp)', calories: 86, protein: 0, carbs: 4, fat: 8 },
+  { name: 'Balsamic vinaigrette (2 tbsp)', calories: 90, protein: 0, carbs: 6, fat: 7 },
+  { name: 'Sour cream (2 tbsp)', calories: 60, protein: 1, carbs: 1, fat: 6 },
+  { name: 'Cream cheese (1 tbsp)', calories: 50, protein: 1, carbs: 1, fat: 5 },
+  { name: 'Peanut butter (1 tbsp)', calories: 95, protein: 4, carbs: 3, fat: 8 },
+  { name: 'Maple syrup (1 tbsp)', calories: 52, protein: 0, carbs: 13, fat: 0 },
+];
+
+function inferCategory(isoTime) {
+  const d = new Date(isoTime);
+  const h = d.getHours() + d.getMinutes() / 60;
+  if (h >= 4 && h < 10.5) return 'breakfast';
+  if (h >= 10.5 && h < 14.5) return 'lunch';
+  if (h >= 14.5 && h < 20.5) return 'dinner';
+  return 'snack';
+}
+
+// =====================
+// STATE & STORAGE
+// =====================
+const DEFAULT_SETTINGS = {
+  calorieTarget: 1700, proteinTarget: 180, carbsTarget: 170, fatTarget: 55,
+  waterTarget: 100, glassSize: 8,
+  startWeight: 310, goalWeight: 210, plateauLow: 240, plateauHigh: 244,
+};
+const todayKey = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const load = (k, f) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : f; } catch { return f; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// =====================
+// CLOUD STORAGE LAYER
+// =====================
+// These replace localStorage for user data. Per-device data (API key,
+// UI preferences) still uses localStorage directly.
+//
+// Strategy: on sign-in we pull everything once into memory. On writes
+// we push to Supabase and update memory. This avoids complex sync
+// logic while keeping the UI responsive.
+
+async function cloudLoadAll(userId) {
+  const out = {
+    settings: null,
+    weights: [],
+    recents: [],
+    exerciseRecents: [],
+    plateauNotes: [],
+    commitments: {},
+    photos: [],
+    savedMeals: [],
+    customCondiments: [],
+  };
+
+  // Settings (single row)
+  const { data: settingsRow } = await sb.from('user_settings').select('settings').eq('user_id', userId).maybeSingle();
+  if (settingsRow) out.settings = settingsRow.settings;
+
+  // Weights
+  const { data: weights } = await sb.from('weights').select('date, weight').eq('user_id', userId).order('date');
+  out.weights = weights || [];
+
+  // Everything else stored in user_data as key/value
+  const { data: kv } = await sb.from('user_data').select('key, value').eq('user_id', userId);
+  if (kv) {
+    for (const row of kv) {
+      if (row.key in out) out[row.key] = row.value;
+    }
+  }
+  return out;
+}
+
+async function cloudLoadDay(userId, date) {
+  const [foodRes, exRes, waterRes] = await Promise.all([
+    sb.from('food_log').select('id, entry').eq('user_id', userId).eq('date', date).order('created_at'),
+    sb.from('exercise_log').select('id, entry').eq('user_id', userId).eq('date', date).order('created_at'),
+    sb.from('water').select('amount').eq('user_id', userId).eq('date', date).maybeSingle(),
+  ]);
+  const log = (foodRes.data || []).map(r => ({ ...r.entry, id: r.id }));
+  const exercise = (exRes.data || []).map(r => ({ ...r.entry, id: r.id }));
+  const water = waterRes.data?.amount || 0;
+  return { log, exercise, water };
+}
+
+async function cloudSaveSettings(userId, settings) {
+  await sb.from('user_settings').upsert({ user_id: userId, settings });
+}
+
+async function cloudSaveData(userId, key, value) {
+  await sb.from('user_data').upsert({ user_id: userId, key, value });
+}
+
+async function cloudAddFood(userId, date, entry) {
+  const { data, error } = await sb.from('food_log').insert({ user_id: userId, date, entry: { ...entry, id: undefined } }).select('id').single();
+  if (error) throw error;
+  return data.id; // Return server-assigned id
+}
+
+async function cloudUpdateFood(userId, id, entry) {
+  await sb.from('food_log').update({ entry: { ...entry, id: undefined } }).eq('id', id).eq('user_id', userId);
+}
+
+async function cloudDeleteFood(userId, id) {
+  await sb.from('food_log').delete().eq('id', id).eq('user_id', userId);
+}
+
+async function cloudAddExercise(userId, date, entry) {
+  const { data, error } = await sb.from('exercise_log').insert({ user_id: userId, date, entry: { ...entry, id: undefined } }).select('id').single();
+  if (error) throw error;
+  return data.id;
+}
+
+async function cloudDeleteExercise(userId, id) {
+  await sb.from('exercise_log').delete().eq('id', id).eq('user_id', userId);
+}
+
+async function cloudSaveWater(userId, date, amount) {
+  await sb.from('water').upsert({ user_id: userId, date, amount });
+}
+
+async function cloudSaveWeight(userId, date, weight) {
+  await sb.from('weights').upsert({ user_id: userId, date, weight });
+}
+
+const state = {
+  // Auth state
+  authReady: false,          // true once we've checked for existing session
+  user: null,                 // supabase user object, null = signed out
+  authEmail: '', authPassword: '', authMode: 'signin', authError: '', authBusy: false,
+  syncStatus: '',             // shown briefly when a cloud op runs
+  loadingCloud: false,        // big spinner during initial data pull
+  migrationPrompt: false,     // show migrate button if local data exists
+
+  // App state
+  setupComplete: load('setup_complete', false),
+  apiKey: load('apiKey', ''),
+  settings: { ...DEFAULT_SETTINGS, ...load('settings', {}) },
+  weights: [],
+  recents: [],
+  exerciseRecents: [],
+  plateauNotes: [],
+  commitments: {},
+  photos: [],
+  savedMeals: [],
+  customCondiments: [],
+  weeklyCache: [],           // cached last-7-days summaries for streak + weekly review
+  mealBuilder: { name: '', category: '', items: [] },
+  editingMealId: null,
+  condimentDraft: { name: '', calories: '', protein: '', carbs: '', fat: '' },
+  showCustomCondiment: false,
+  condimentSearch: '',
+  condimentSearchResults: [],
+  dismissedReminderDate: null,
+  viewDate: todayKey(),
+  log: [], water: 0, exercise: [],
+  modal: null,
+  addMode: 'search',
+  editingId: null,
+  editDraft: null,
+  exerciseDraft: { name: '', calories: '', duration: '' },
+  plateauDraft: { triggers: [], notes: '' },
+  photoCompareSelection: [],
+  viewingPhotoId: null,
+  searchResults: [],
+  searchInput: '', quickInput: '',
+  preLogDraft: null,  // { name, calories, protein, carbs, fat } — shown before committing to log
+  manual: { name: '', calories: '', protein: '', carbs: '', fat: '', category: '', notes: '' },
+  servings: '1',
+  newWeight: '',
+  welcomeKey: '',
+  settingsDraft: null,
+  settingsKeyDraft: '',
+  showKey: false,
+  analyzing: false,
+  error: '',
+};
+
+async function loadDay(date) {
+  state.viewDate = date;
+  state.log = [];
+  state.water = 0;
+  state.exercise = [];
+  render();
+  if (!state.user) return;
+  try {
+    const { log, exercise, water } = await cloudLoadDay(state.user.id, date);
+    state.log = log;
+    state.exercise = exercise;
+    state.water = water;
+    render();
+  } catch (e) {
+    console.error('loadDay failed', e);
+  }
+}
+
+// =====================
+// COMPUTATIONS
+// =====================
+function computed() {
+  const t = state.log.reduce((a, f) => ({
+    calories: a.calories + (f.calories || 0),
+    protein: a.protein + (f.protein || 0),
+    carbs: a.carbs + (f.carbs || 0),
+    fat: a.fat + (f.fat || 0),
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  const burned = state.exercise.reduce((a, e) => a + (e.calories || 0), 0);
+  const netCalories = t.calories - burned;
+  const cw = state.weights.length ? state.weights[state.weights.length - 1].weight : state.settings.startWeight;
+  const lost = (state.settings.startWeight - cw).toFixed(1);
+  const toGoal = (cw - state.settings.goalWeight).toFixed(1);
+  const inPlateau = cw >= state.settings.plateauLow && cw <= state.settings.plateauHigh;
+  const remaining = state.settings.calorieTarget - netCalories;
+  const progressPct = Math.min(((state.settings.startWeight - cw) / (state.settings.startWeight - state.settings.goalWeight)) * 100, 100);
+
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
+  const cutoffKey = cutoff.toISOString().slice(0, 10);
+  const recentWeights = state.weights.filter(w => w.date >= cutoffKey);
+  const weeklyAvg = recentWeights.length ? (recentWeights.reduce((a, w) => a + w.weight, 0) / recentWeights.length) : null;
+
+  // Streak: consecutive past days in weeklyCache where cals were logged and <= target
+  let streak = 0;
+  const today = todayKey();
+  const byDate = {};
+  for (const d of state.weeklyCache) byDate[d.date] = d;
+  const d = new Date(); d.setDate(d.getDate() - 1);
+  for (let i = 0; i < 365; i++) {
+    const key = d.toISOString().slice(0, 10);
+    const rec = byDate[key];
+    if (!rec || !rec.logCount) break;
+    if (rec.cals > state.settings.calorieTarget) break;
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+
+  return { totals: t, burned, netCalories, currentWeight: cw, lost, toGoal, inPlateau, remaining, progressPct, weeklyAvg, streak };
+}
+
+function projectGoalDate() {
+  if (state.weights.length < 3) return null;
+  const recent = state.weights.slice(-21);
+  if (recent.length < 3) return null;
+  const first = recent[0], last = recent[recent.length - 1];
+  const daysDiff = (new Date(last.date) - new Date(first.date)) / 86400000;
+  if (daysDiff < 7) return null;
+  const weightDiff = first.weight - last.weight;
+  if (weightDiff <= 0.5) return null;
+  const ratePerDay = weightDiff / daysDiff;
+  const remaining = last.weight - state.settings.goalWeight;
+  if (remaining <= 0) return 'reached';
+  const daysToGoal = remaining / ratePerDay;
+  if (daysToGoal > 730) return null;
+  const projected = new Date();
+  projected.setDate(projected.getDate() + Math.round(daysToGoal));
+  return projected;
+}
+
+function computeWeekly() {
+  // Build a 7-day array from weeklyCache, filling in zeros for any missing days
+  const byDate = {};
+  for (const d of state.weeklyCache) byDate[d.date] = d;
+  const days = [];
+  const d = new Date();
+  for (let i = 0; i < 7; i++) {
+    const key = d.toISOString().slice(0, 10);
+    days.push(byDate[key] || { date: key, cals: 0, burned: 0, water: 0, logCount: 0 });
+    d.setDate(d.getDate() - 1);
+  }
+  days.reverse();
+  const loggedDays = days.filter(d => d.logCount > 0);
+  const avgCal = loggedDays.length ? loggedDays.reduce((a, d) => a + d.cals, 0) / loggedDays.length : 0;
+  const underTarget = loggedDays.filter(d => d.cals <= state.settings.calorieTarget).length;
+  const totalBurned = days.reduce((a, d) => a + d.burned, 0);
+  const avgWater = days.reduce((a, d) => a + d.water, 0) / 7;
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekAgoKey = weekAgo.toISOString().slice(0, 10);
+  const startW = state.weights.filter(w => w.date <= weekAgoKey).slice(-1)[0];
+  const endW = state.weights[state.weights.length - 1];
+  const weightChange = (startW && endW) ? (endW.weight - startW.weight).toFixed(1) : null;
+  return { days, avgCal, underTarget, loggedDays: loggedDays.length, totalBurned, avgWater, weightChange };
+}
+
+// Refresh the 7-day cache from cloud. Called after login and after food/exercise writes.
+async function refreshWeeklyCache() {
+  if (!state.user) return;
+  const today = new Date();
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 365); // only need last year for streak
+  const cutoffKey = cutoff.toISOString().slice(0, 10);
+  const todayK = today.toISOString().slice(0, 10);
+
+  try {
+    // Pull food log summaries across the window. For streak we need further back than 7d
+    const { data: foods } = await sb.from('food_log')
+      .select('date, entry')
+      .eq('user_id', state.user.id)
+      .gte('date', cutoffKey)
+      .lte('date', todayK);
+    const { data: ex } = await sb.from('exercise_log')
+      .select('date, entry')
+      .eq('user_id', state.user.id)
+      .gte('date', cutoffKey)
+      .lte('date', todayK);
+    const { data: waters } = await sb.from('water')
+      .select('date, amount')
+      .eq('user_id', state.user.id)
+      .gte('date', cutoffKey)
+      .lte('date', todayK);
+
+    const byDate = {};
+    const ensure = (date) => byDate[date] = byDate[date] || { date, cals: 0, burned: 0, water: 0, logCount: 0 };
+    for (const r of (foods || [])) {
+      const day = ensure(r.date);
+      day.cals += r.entry?.calories || 0;
+      day.logCount += 1;
+    }
+    for (const r of (ex || [])) {
+      const day = ensure(r.date);
+      day.burned += r.entry?.calories || 0;
+    }
+    for (const r of (waters || [])) {
+      const day = ensure(r.date);
+      day.water = r.amount || 0;
+    }
+    state.weeklyCache = Object.values(byDate);
+    render();
+  } catch (e) {
+    console.error('refreshWeeklyCache failed', e);
+  }
+}
+
+function getReminder() {
+  if (state.viewDate !== todayKey()) return null;
+  if (state.dismissedReminderDate === todayKey()) return null;
+  const hour = new Date().getHours();
+  const groups = groupByCategory(state.log);
+  if (hour >= 21 && groups.dinner.length === 0 && state.log.length > 0) return 'Haven\'t logged dinner yet.';
+  if (hour >= 15 && groups.lunch.length === 0 && groups.dinner.length === 0) return 'No lunch logged yet today.';
+  if (hour >= 12 && state.log.length === 0) return 'No food logged yet today.';
+  return null;
+}
+
+function todayCommit() { return !!state.commitments[todayKey()]; }
+function todayHasNote() {
+  const today = todayKey();
+  return state.plateauNotes.some(n => n.date === today);
+}
+
+// =====================
+// API
+// =====================
+const MODEL = 'claude-haiku-4-5-20251001';
+async function callClaude(body) {
+  if (!state.apiKey) throw new Error('No API key — add in Settings');
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json', 'x-api-key': state.apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`API ${res.status}: ${txt.slice(0, 120)}`);
+  }
+  const data = await res.json();
+  return data.content.filter(b => b.type === 'text').map(b => b.text).join('');
+}
+function extractJSON(text) {
+  if (!text) throw new Error('Empty response');
+  let s = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+  try { return JSON.parse(s); } catch {}
+  for (const [o, c] of [['[', ']'], ['{', '}']]) {
+    const a = s.indexOf(o), b = s.lastIndexOf(c);
+    if (a !== -1 && b > a) { try { return JSON.parse(s.slice(a, b + 1)); } catch {} }
+  }
+  throw new Error('Invalid JSON');
+}
+async function estimateByName(desc) {
+  const t = await callClaude({ model: MODEL, max_tokens: 400, messages: [{ role: 'user', content: `Estimate nutrition for: "${desc}". Typical portion unless specified. ONLY JSON. Schema: {"name": string, "calories": int, "protein": int, "carbs": int, "fat": int}.` }] });
+  return extractJSON(t);
+}
+async function searchOptionsAPI(q) {
+  const t = await callClaude({ model: MODEL, max_tokens: 800, messages: [{ role: 'user', content: `Food: "${q}". Return 5 realistic options with accurate nutrition. Include portion size in each name (e.g. "6 oz", "1 cup", "1 medium"). If "${q}" is a specific brand/restaurant item, use their actual published values. Vary portion sizes from small to large meaningfully. ONLY JSON array. Schema: [{"name": string, "calories": int, "protein": int, "carbs": int, "fat": int}].` }] });
+  const r = extractJSON(t);
+  if (!Array.isArray(r)) throw new Error('Expected array');
+  return r;
+}
+async function readLabel(base64, mt, sv) {
+  const t = await callClaude({ model: MODEL, max_tokens: 400, messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mt, data: base64 } }, { type: 'text', text: `Nutrition label. User ate ${sv} serving(s). Multiply per-serving by ${sv}. ONLY JSON. Schema: {"name": string, "calories": int, "protein": int, "carbs": int, "fat": int}.` }] }] });
+  return extractJSON(t);
+}
+async function estimateExercise(desc) {
+  const t = await callClaude({ model: MODEL, max_tokens: 300, messages: [{ role: 'user', content: `Estimate calories burned for a ${state.settings.startWeight - (state.weights.length ? (state.settings.startWeight - state.weights[state.weights.length-1].weight) : 0)}lb person doing: "${desc}". ONLY JSON. Schema: {"name": string (short clean name), "calories": int (burned), "duration": int (minutes, 0 if unspecified)}.` }] });
+  return extractJSON(t);
+}
+
+async function searchCondiment(query) {
+  const t = await callClaude({
+    model: MODEL, max_tokens: 600,
+    messages: [{ role: 'user', content: `Find nutrition for condiment/sauce/dressing: "${query}". If it's from a specific restaurant/brand (e.g. Chick-fil-A sauce, Panera dressing, McDonald's sweet and sour), use that brand's actual values. Return 3 variations — typical serving sizes (packet, 1 tbsp, 2 tbsp). ONLY JSON array. Schema: [{"name": string (include brand + serving size), "calories": int, "protein": int, "carbs": int, "fat": int}]. Small to large serving.` }],
+  });
+  const r = extractJSON(t);
+  if (!Array.isArray(r)) throw new Error('Expected array');
+  return r;
+}
+
+// =====================
+// IMAGE COMPRESSION
+// =====================
+function compressImage(file, maxDim = 800, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > height && width > maxDim) { height = height * maxDim / width; width = maxDim; }
+        else if (height > maxDim) { width = width * maxDim / height; height = maxDim; }
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// =====================
+// RENDER HELPERS
+// =====================
+function ringSVG(value, target, size = 168, stroke = 12) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const pct = Math.min(value / target, 1);
+  const over = value > target;
+  const dash = c * pct;
+  return `<svg width="${size}" height="${size}">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="#1f1f1f" stroke-width="${stroke}"/>
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${over ? '#ff5a4a' : '#d4ff3f'}" stroke-width="${stroke}" stroke-dasharray="${dash} ${c}" stroke-linecap="round" transform="rotate(-90 ${size/2} ${size/2})" style="transition: stroke-dasharray 0.6s ease, stroke 0.3s ease"/>
+  </svg>`;
+}
+function macroBar(label, value, target, iconName, color) {
+  const pct = Math.min((value / target) * 100, 100);
+  const over = value > target;
+  return `<div>
+    <div class="row between mb-1">
+      <div class="row" style="gap:6px">${icon(iconName, 13, color, 2.5)}<span class="tiny">${label}</span></div>
+      <span class="mono small" style="color:#e5e5e5">
+        <span style="${over ? 'color:#ff8a80' : ''}">${Math.round(value)}</span><span class="muted">/${target}g</span>
+      </span>
+    </div>
+    <div class="macro-bar-bg"><div class="macro-bar-fg" style="width:${pct}%;background:${over ? '#ff5a4a' : color}"></div></div>
+  </div>`;
+}
+function sparkline() {
+  const recent = state.weights.slice(-14);
+  if (recent.length < 2) return '';
+  const ws = recent.map(w => w.weight);
+  const min = Math.min(...ws, state.settings.plateauLow) - 1;
+  const max = Math.max(...ws, state.settings.plateauHigh) + 1;
+  const range = max - min;
+  const w = 300, h = 60;
+  const pts = recent.map((pt, i) => [(i / (recent.length - 1)) * w, h - ((pt.weight - min) / range) * h]);
+  const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const pTop = h - ((state.settings.plateauHigh - min) / range) * h;
+  const pBot = h - ((state.settings.plateauLow - min) / range) * h;
+  const dots = pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="${i === pts.length - 1 ? 3 : 1.5}" fill="#d4ff3f"/>`).join('');
+  return `<div style="padding:0 16px 16px">
+    <div class="tiny mono mb-2">Last ${recent.length} entries</div>
+    <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:56px">
+      <rect x="0" y="${pTop}" width="${w}" height="${pBot - pTop}" fill="rgba(245,158,11,0.1)"/>
+      <line x1="0" y1="${pTop}" x2="${w}" y2="${pTop}" stroke="rgba(245,158,11,0.4)" stroke-width="1" stroke-dasharray="2,3"/>
+      <line x1="0" y1="${pBot}" x2="${w}" y2="${pBot}" stroke="rgba(245,158,11,0.4)" stroke-width="1" stroke-dasharray="2,3"/>
+      <path d="${path}" fill="none" stroke="#d4ff3f" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      ${dots}
+    </svg>
+  </div>`;
+}
+function groupByCategory(log) {
+  const groups = { breakfast: [], lunch: [], dinner: [], snack: [] };
+  for (const entry of log) {
+    const cat = entry.category || inferCategory(entry.time);
+    (groups[cat] || groups.snack).push(entry);
+  }
+  return groups;
+}
+function formatDateLabel(dateStr) {
+  const today = todayKey();
+  if (dateStr === today) return 'Today';
+  const yestDate = new Date(); yestDate.setDate(yestDate.getDate() - 1);
+  const yestKey = yestDate.toISOString().slice(0, 10);
+  if (dateStr === yestKey) return 'Yesterday';
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+function fmtDateShort(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// =====================
+// RENDER: WELCOME
+// =====================
+function renderBoot(msg) {
+  return `<div class="welcome"><div class="welcome-inner" style="text-align:center">
+    <div style="font-size:40px;margin-bottom:8px">🔥</div>
+    <div class="display" style="font-size:32px;margin-bottom:16px">The Cut.</div>
+    <div class="row" style="gap:10px;justify-content:center;color:#a3a3a3">
+      ${icon('loader', 16, '#d4ff3f', 2, 'spin')}
+      <span>${esc(msg || 'Starting up…')}</span>
+    </div>
+  </div></div>`;
+}
+
+function renderAuth() {
+  const isSignUp = state.authMode === 'signup';
+  return `<div class="welcome"><div class="welcome-inner">
+    <div class="tiny mono mb-1">${isSignUp ? 'Create account' : 'Sign in'}</div>
+    <h1 class="display" style="font-size:36px;margin-bottom:8px">The Cut.</h1>
+    <p class="dim" style="line-height:1.5;margin-bottom:24px;font-size:14px">
+      ${isSignUp ? 'Sign up with an email and password. You can then sign in from your phone, iPad, or MacBook and your data syncs automatically.' : 'Welcome back. Sign in to sync your data across devices.'}
+    </p>
+    <div class="space-y-3">
+      <div>
+        <label class="field-label">Email</label>
+        <input id="auth-email" class="field" type="email" autocomplete="email" value="${esc(state.authEmail)}" placeholder="you@example.com" oninput="state.authEmail = this.value" ${state.authBusy ? 'disabled' : ''}/>
+      </div>
+      <div>
+        <label class="field-label">Password <span class="muted" style="letter-spacing:0;text-transform:none">(min 6 chars)</span></label>
+        <input id="auth-password" class="field" type="password" autocomplete="${isSignUp ? 'new-password' : 'current-password'}" value="${esc(state.authPassword)}" placeholder="••••••••" oninput="state.authPassword = this.value" onkeydown="if(event.key==='Enter') handleAuth()" ${state.authBusy ? 'disabled' : ''}/>
+      </div>
+      ${state.authError ? `<div class="error">${esc(state.authError)}</div>` : ''}
+      <button class="btn btn-primary" onclick="handleAuth()" ${state.authBusy || !state.authEmail.trim() || state.authPassword.length < 6 ? 'disabled' : ''}>
+        ${state.authBusy ? `${icon('loader', 16, 'currentColor', 2, 'spin')} ${isSignUp ? 'Creating…' : 'Signing in…'}` : (isSignUp ? 'Create account' : 'Sign in')}
+      </button>
+      <button class="btn btn-secondary" onclick="switchAuthMode()" ${state.authBusy ? 'disabled' : ''}>
+        ${isSignUp ? 'Have an account? Sign in' : 'New here? Create account'}
+      </button>
+      ${!isSignUp ? `<button onclick="handleForgotPassword()" style="display:block;margin:8px auto 0;font-size:12px;color:#737373">Forgot password?</button>` : ''}
+    </div>
+    <div class="small muted mt-4" style="text-align:center;line-height:1.5">
+      Your data is stored privately on Supabase. Only you can see it.
+    </div>
+  </div></div>`;
+}
+
+// =====================
+// RENDER: MAIN
+// =====================
+function renderMain() {
+  const c = computed();
+  const isToday = state.viewDate === todayKey();
+  const dateLabel = formatDateLabel(state.viewDate);
+  const reminder = getReminder();
+
+  return `
+    <div class="wrap">
+      <div class="grain">
+        <div class="header">
+          <div>
+            <div class="tiny mono">${new Date(state.viewDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+            <h1 class="display" style="margin-top:2px">The Cut.</h1>
+          </div>
+          <div class="header-btns">
+            <button class="iconbtn" onclick="openModal('weeklyReview')" title="Weekly review">${icon('chart', 15, '#a3a3a3')}</button>
+            <button class="iconbtn" onclick="openModal('settings')" title="Settings">${icon('settings', 16, '#a3a3a3')}</button>
+          </div>
+        </div>
+
+        <div class="datenav">
+          <button class="datenav-btn" onclick="prevDay()">${icon('chevronL', 20)}</button>
+          <div class="datenav-label">${dateLabel}</div>
+          <button class="datenav-btn" onclick="nextDay()" ${isToday ? 'disabled' : ''}>${icon('chevronR', 20)}</button>
+          ${!isToday ? `<button class="today-btn" onclick="goToday()">TODAY</button>` : ''}
+        </div>
+
+        ${reminder ? `
+          <div class="banner-reminder fadein">
+            ${icon('alert', 15, '#22d3ee')}
+            <div>${esc(reminder)}</div>
+            <button onclick="dismissReminder()">${icon('x', 14)}</button>
+          </div>
+        ` : ''}
+
+        ${state.migrationPrompt ? `
+          <div class="banner-reminder fadein" style="border-color:rgba(212,255,63,0.3);background:rgba(212,255,63,0.05);color:#d4ff3f">
+            ${icon('sparkles', 15, '#d4ff3f')}
+            <div style="flex:1">We found local data from before you signed in. Import it to the cloud?</div>
+            <button onclick="migrateLocalToCloud()" style="color:#d4ff3f;padding:4px 10px;border:1px solid rgba(212,255,63,0.3);border-radius:6px;font-size:12px;font-weight:600">Import</button>
+            <button onclick="state.migrationPrompt=false;render()" style="color:#737373;padding:4px">${icon('x', 14)}</button>
+          </div>
+        ` : ''}
+        ${c.inPlateau ? renderPlateauBanner() : ''}
+
+        <div class="px-5 row between">
+          <div class="ring-wrap">
+            ${ringSVG(c.netCalories, state.settings.calorieTarget)}
+            <div class="ring-text">
+              <div class="tiny mono">${c.remaining >= 0 ? 'Remaining' : 'Over'}</div>
+              <div class="display ${c.remaining < 0 ? 'red' : 'lime'}" style="font-size:38px">${Math.abs(c.remaining)}</div>
+              <div class="tiny mono">${c.totals.calories}${c.burned ? ` - ${c.burned}` : ''} / ${state.settings.calorieTarget}</div>
+            </div>
+          </div>
+          <div class="flex1 space-y-3" style="margin-left:24px">
+            ${macroBar('Protein', c.totals.protein, state.settings.proteinTarget, 'zap', '#d4ff3f')}
+            ${macroBar('Carbs', c.totals.carbs, state.settings.carbsTarget, 'wheat', '#60a5fa')}
+            ${macroBar('Fat', c.totals.fat, state.settings.fatTarget, 'droplet', '#fb923c')}
+          </div>
+        </div>
+        ${c.burned > 0 ? `<div class="px-5 mt-3"><div class="small mono" style="color:#86efac;text-align:center">🔥 ${c.burned} cal burned today</div></div>` : ''}
+      </div>
+
+      <div class="px-5 mt-5">${renderWaterCard()}</div>
+      <div class="px-5 mt-3">${renderWeightCard(c)}</div>
+
+      <div class="px-5 mt-3 grid3">
+        <div class="card" style="padding:12px">
+          <div class="row mb-1" style="gap:6px">${icon('trend', 13, '#a3e635')}<div class="tiny mono">Down</div></div>
+          <div class="display" style="font-size:18px">${c.lost} <span class="muted" style="font-size:11px;font-weight:400">lbs</span></div>
+        </div>
+        <div class="card" style="padding:12px">
+          <div class="row mb-1" style="gap:6px">${icon('trophy', 13, '#fbbf24')}<div class="tiny mono">Goal</div></div>
+          <div class="display" style="font-size:18px">${state.settings.goalWeight} <span class="muted" style="font-size:11px;font-weight:400">lbs</span></div>
+        </div>
+        <div class="card" style="padding:12px">
+          <div class="row mb-1" style="gap:6px">${icon('fire', 13, '#fb923c')}<div class="tiny mono">Streak</div></div>
+          <div class="display" style="font-size:18px">${c.streak} <span class="muted" style="font-size:11px;font-weight:400">${c.streak === 1 ? 'day' : 'days'}</span></div>
+        </div>
+      </div>
+
+      ${renderFoodLog()}
+      ${renderExerciseSection()}
+      ${renderPhotosSection()}
+
+      <button class="anchor-btn" onclick="openModal('breakGlass')" title="Anchor me">${icon('shield', 20, '#fb923c')}</button>
+      <button class="fab" onclick="openModal('add')">${icon('plus', 26, '#0a0a0a', 2.5)}</button>
+    </div>
+
+    ${state.modal === 'add' ? renderAddModal() : ''}
+    ${state.modal === 'weight' ? renderWeightModal() : ''}
+    ${state.modal === 'settings' ? renderSettingsModal() : ''}
+    ${state.modal === 'edit' ? renderEditModal() : ''}
+    ${state.modal === 'preLog' ? renderPreLogModal() : ''}
+    ${state.modal === 'exercise' ? renderExerciseModal() : ''}
+    ${state.modal === 'plateauNote' ? renderPlateauNoteModal() : ''}
+    ${state.modal === 'plateauHistory' ? renderPlateauHistoryModal() : ''}
+    ${state.modal === 'breakGlass' ? renderBreakGlassModal() : ''}
+    ${state.modal === 'weeklyReview' ? renderWeeklyReviewModal() : ''}
+    ${state.modal === 'photoCompare' ? renderPhotoCompareModal() : ''}
+    ${state.modal === 'photoView' ? renderPhotoViewModal() : ''}
+    ${state.modal === 'mealBuilder' ? renderMealBuilderModal() : ''}
+  `;
+}
+
+function renderPlateauBanner() {
+  const committed = todayCommit();
+  const hasNote = todayHasNote();
+  return `
+    <div class="banner">
+      <div class="row" style="gap:12px;align-items:flex-start">
+        ${icon('alert', 18, '#fbbf24')}
+        <div style="font-size:13px;line-height:1.4;flex:1">
+          <div class="amber" style="font-weight:600;margin-bottom:2px">Plateau zone.</div>
+          <div style="color:#d4d4d4">You're in the 240-244 range — right where the cycle usually starts.</div>
+        </div>
+      </div>
+      <div class="banner-buttons">
+        <button class="banner-btn ${committed ? 'committed' : ''}" onclick="toggleCommit()">
+          ${committed ? `${icon('check', 13)} Committed today` : `${icon('target', 13)} Commit to 1700`}
+        </button>
+        <button class="banner-btn" onclick="openModal('plateauNote')">
+          ${icon('journal', 13)} ${hasNote ? 'Journal' : 'Journal this'}
+        </button>
+        ${state.plateauNotes.length > 0 ? `<button class="banner-btn" onclick="openModal('plateauHistory')" style="padding:8px">${icon('history', 13)}</button>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderWaterCard() {
+  const glassSize = state.settings.glassSize || 8;
+  const target = state.settings.waterTarget || 100;
+  const pct = Math.min((state.water / target) * 100, 100);
+  const glasses = Math.round(state.water / glassSize);
+  return `<div class="card water-card">
+    <div class="water-info">
+      <div class="row mb-1" style="gap:6px">${icon('droplet', 13, '#22d3ee')}<span class="tiny">Water</span></div>
+      <div class="display" style="font-size:20px">${state.water} <span class="muted" style="font-size:12px;font-weight:400">/ ${target} oz · ${glasses} glasses</span></div>
+      <div class="progress-bg mt-2"><div class="progress-fg" style="width:${pct}%;background:linear-gradient(90deg,#0891b2,#22d3ee)"></div></div>
+    </div>
+    <div class="water-btns">
+      <button class="water-btn" onclick="addWater(${-glassSize})" ${state.water <= 0 ? 'disabled' : ''}>${icon('minus', 14, '#22d3ee', 2.5)}</button>
+      <button class="water-btn plus" onclick="addWater(${glassSize})">${icon('plus', 14, '#22d3ee', 2.5)}</button>
+    </div>
+  </div>`;
+}
+
+function renderWeightCard(c) {
+  const projection = projectGoalDate();
+  return `<div class="card">
+    <div class="row between card-pad">
+      <div>
+        <div class="tiny mono mb-1">Current</div>
+        <div class="display" style="font-size:22px">${c.currentWeight} <span class="muted" style="font-size:14px;font-weight:400">lbs</span></div>
+        ${c.weeklyAvg !== null ? `<div class="small mono muted mt-1">7d avg: ${c.weeklyAvg.toFixed(1)} lbs</div>` : ''}
+      </div>
+      <div style="text-align:right">
+        <div class="tiny mono mb-1">To goal</div>
+        <div class="display lime" style="font-size:22px">${c.toGoal} <span class="muted" style="font-size:14px;font-weight:400">lbs</span></div>
+        ${projection === 'reached' ? `<div class="small mono" style="color:#86efac;margin-top:4px">Goal reached!</div>` : projection ? `<div class="small mono muted mt-1" style="color:#bef264">~ ${projection.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>` : ''}
+      </div>
+    </div>
+    <div style="padding:0 16px 12px">
+      <div class="progress-bg"><div class="progress-fg" style="width:${c.progressPct}%;background:linear-gradient(90deg,#65a30d,#d4ff3f)"></div></div>
+      <div class="row between mt-2 tiny mono">
+        <span>${state.settings.startWeight}</span>
+        <span class="lime">-${c.lost} lbs · ${c.progressPct.toFixed(0)}%</span>
+        <span>${state.settings.goalWeight}</span>
+      </div>
+    </div>
+    ${sparkline()}
+    <div style="border-top:1px solid #262626;padding:4px">
+      <button onclick="openModal('weight')" style="width:100%;padding:10px;display:flex;align-items:center;justify-content:center;gap:8px;color:#d4d4d4;font-size:14px;font-weight:500">
+        ${icon('scale', 15)} Log weight
+      </button>
+    </div>
+  </div>`;
+}
+
+function renderFoodLog() {
+  const groups = groupByCategory(state.log);
+  const order = ['breakfast', 'lunch', 'dinner', 'snack'];
+  const hasAny = state.log.length > 0;
+  return `
+    <div class="subsection-head">
+      <h2 class="display">Food</h2>
+      <span class="tiny mono">${state.log.length} items</span>
+    </div>
+    <div class="px-5">
+      ${!hasAny ? `
+        <div class="empty-state">
+          ${icon('flame', 22, '#525252')}
+          <div class="dim" style="margin-top:8px">Nothing logged yet.</div>
+          <div class="small muted mt-1">Tap the + button to start.</div>
+        </div>
+      ` : order.filter(k => groups[k].length > 0).map(k => {
+        const cat = CATEGORIES[k];
+        const catCal = groups[k].reduce((a, f) => a + (f.calories || 0), 0);
+        return `
+          <div class="cat-header">
+            <div class="cat-dot" style="background:${cat.color}"></div>
+            <div class="cat-name" style="color:${cat.color}">${cat.label}</div>
+            <div class="cat-total">${catCal} cal</div>
+          </div>
+          <div class="space-y-2">
+            ${groups[k].map(f => `
+              <button class="card log-item" onclick="openEdit(${f.id})">
+                <div class="flex1">
+                  <div class="truncate" style="font-weight:500;font-size:14px">${esc(f.name)}</div>
+                  <div class="small mono muted" style="margin-top:2px">
+                    <span class="lime">${f.calories}</span> cal · P${f.protein} C${f.carbs} F${f.fat}${f.notes ? ' · ' + icon('note', 10, '#737373') : ''}
+                  </div>
+                </div>
+                ${icon('chevronR', 16, '#525252')}
+              </button>
+            `).join('')}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderExerciseSection() {
+  const totalBurned = state.exercise.reduce((a, e) => a + (e.calories || 0), 0);
+  return `
+    <div class="subsection-head">
+      <div class="row" style="gap:8px">
+        <h2 class="display">Exercise</h2>
+        ${totalBurned > 0 ? `<span class="tiny mono" style="color:#86efac">${totalBurned} cal</span>` : ''}
+      </div>
+      <button class="add-btn-sm" onclick="openModal('exercise')">${icon('plus', 12)} Add</button>
+    </div>
+    <div class="px-5">
+      ${state.exercise.length === 0 ? `
+        <div class="card" style="padding:16px;text-align:center"><div class="small muted">No exercise logged.</div></div>
+      ` : `
+        <div class="space-y-2">
+          ${state.exercise.map(e => `
+            <div class="card log-item">
+              <div class="flex1">
+                <div class="truncate" style="font-weight:500;font-size:14px">${esc(e.name)}</div>
+                <div class="small mono muted" style="margin-top:2px">
+                  <span style="color:#86efac">-${e.calories}</span> cal${e.duration ? ` · ${e.duration} min` : ''}
+                </div>
+              </div>
+              <button onclick="deleteExercise(${e.id})" style="padding:8px;color:#525252">${icon('trash', 15)}</button>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function renderPhotosSection() {
+  return `
+    <div class="subsection-head">
+      <div class="row" style="gap:8px">
+        <h2 class="display">Photos</h2>
+        ${state.photos.length >= 2 ? `<button class="add-btn-sm" onclick="openModal('photoCompare')">${icon('image', 11)} Compare</button>` : ''}
+      </div>
+      <div class="row" style="gap:6px">
+        <button class="add-btn-sm" onclick="document.getElementById('photo-upload-lib').click()" title="From library">${icon('image', 12)}</button>
+        <button class="add-btn-sm" onclick="document.getElementById('photo-upload').click()">${icon('camera', 12)} Snap</button>
+      </div>
+    </div>
+    <input id="photo-upload" type="file" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoUpload(this.files[0])"/>
+    <input id="photo-upload-lib" type="file" accept="image/*" style="display:none" onchange="handlePhotoUpload(this.files[0])"/>
+    <div class="px-5">
+      ${state.photos.length === 0 ? `
+        <div class="card" style="padding:20px;text-align:center">
+          <div class="small muted">No progress photos yet.</div>
+          <div class="small muted mt-1" style="opacity:0.7">The scale lies on bad days. Photos don't.</div>
+        </div>
+      ` : `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          ${state.photos.slice().reverse().map(p => `
+            <button class="photo-thumb" onclick="viewPhoto(${p.id})">
+              <img src="${p.dataUrl}" alt=""/>
+              <div class="photo-thumb-label">${fmtDateShort(p.date)}</div>
+            </button>
+          `).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+// =====================
+// RENDER: ADD MODAL (unchanged from before)
+// =====================
+function renderAddModal() {
+  const needsKey = !state.apiKey && !['manual', 'meals', 'sauce'].includes(state.addMode);
+  const tabs = [
+    { id: 'search', label: 'Search', icon: 'search' },
+    { id: 'quick', label: 'Quick', icon: 'sparkles' },
+    { id: 'photo', label: 'Label', icon: 'camera' },
+    { id: 'meals', label: 'Meals', icon: 'journal' },
+    { id: 'sauce', label: 'Sauce', icon: 'droplet' },
+    { id: 'manual', label: 'Manual', icon: 'edit' },
+  ];
+  return `
+    <div class="overlay" onclick="if(event.target===this && !state.analyzing) closeModal()">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h3 class="display">Log food</h3>
+          <button onclick="if(!state.analyzing) closeModal()" class="muted" style="padding:4px">${icon('x', 20)}</button>
+        </div>
+        ${state.recents.length > 0 ? `
+          <div style="padding:0 20px 12px;flex-shrink:0">
+            <div class="row mb-2" style="gap:6px">${icon('history', 12, '#737373')}<div class="tiny mono">Recent</div></div>
+            <div class="row hscroll" style="gap:8px;margin:0 -20px;padding:0 20px 4px">
+              ${state.recents.map((r, i) => `
+                <button class="pill" onclick="addFromRecent(${i})" ${state.analyzing ? 'disabled' : ''}>
+                  <div class="truncate" style="font-size:12px;font-weight:500;color:#e5e5e5;max-width:140px">${esc(r.name)}</div>
+                  <div class="small mono muted">${r.calories} cal · ${r.protein}p</div>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+        <div style="padding:0 20px 12px;flex-shrink:0">
+          <div class="tabs">
+            ${tabs.map(t => `
+              <button class="tab ${state.addMode === t.id ? 'active' : ''}" onclick="setMode('${t.id}')">
+                ${icon(t.icon, 14)}
+                ${t.label}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+        <div class="sheet-body">
+          ${needsKey ? `<div class="warn">No API key set. Add it in Settings, or use Manual.</div>` : ''}
+          ${renderAddMode()}
+          ${state.error ? `<div class="error">${esc(state.error)}</div>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+function renderAddMode() {
+  if (state.addMode === 'search') {
+    // Filter user's own foods (recents + saved meal items) on every keystroke
+    const q = state.searchInput.trim().toLowerCase();
+    const savedMealItems = state.savedMeals.flatMap(m => m.items || []);
+    const pool = [...state.recents, ...savedMealItems];
+    // Dedupe by name
+    const seen = new Set();
+    const unique = pool.filter(p => {
+      const k = (p.name || '').toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    const mineMatches = q ? unique.filter(p => (p.name || '').toLowerCase().includes(q)) : unique.slice(0, 8);
+
+    return `
+      <div class="field-wrap">
+        <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);z-index:1">${icon('search', 17, '#737373')}</span>
+        <input id="search-input" class="field" type="text" value="${esc(state.searchInput)}" placeholder="Search your foods or anything else..." oninput="state.searchInput = this.value; render()" onkeydown="if(event.key==='Enter') handleSearch()" style="padding-left:44px" ${state.analyzing ? 'disabled' : ''} autofocus/>
+      </div>
+
+      ${mineMatches.length > 0 ? `
+        <div class="mt-3">
+          <div class="row between mb-2">
+            <div class="tiny mono">${q ? `Your foods (${mineMatches.length})` : 'Your foods'}</div>
+            ${!q ? `<div class="tiny mono muted">Showing ${Math.min(unique.length, 8)} of ${unique.length}</div>` : ''}
+          </div>
+          <div class="space-y-2">
+            ${mineMatches.slice(0, 10).map(f => {
+              const idx = unique.indexOf(f);
+              return `
+                <button class="result" onclick="openPreLog('mine', ${idx})">
+                  <div style="font-weight:500;font-size:14px">${esc(f.name)}</div>
+                  <div class="small mono muted" style="margin-top:2px">
+                    <span class="lime">${f.calories}</span> cal · P${f.protein} C${f.carbs} F${f.fat}
+                  </div>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      ${q ? `
+        <button class="btn btn-secondary mt-3" onclick="handleSearch()" ${state.analyzing ? 'disabled' : ''}>
+          ${state.analyzing ? `${icon('loader', 16, 'currentColor', 2, 'spin')} Searching…` : `${icon('sparkles', 14)} ${mineMatches.length > 0 ? 'Search with AI instead' : 'Search with AI'}`}
+        </button>
+      ` : (mineMatches.length === 0 ? `
+        <div class="empty-state mt-3" style="padding:20px">
+          <div class="small muted">Start typing to search your foods, or type something new and tap "Search with AI".</div>
+        </div>
+      ` : '')}
+
+      ${state.searchResults.length > 0 ? `
+        <div class="mt-4 space-y-2">
+          <div class="tiny mono">From AI search</div>
+          ${state.searchResults.map((r, i) => `
+            <button class="result" onclick="openPreLog('ai', ${i})">
+              <div style="font-weight:500;font-size:14px">${esc(r.name)}</div>
+              <div class="small mono muted" style="margin-top:2px">
+                <span class="lime">${r.calories}</span> cal · P${r.protein} C${r.carbs} F${r.fat}
+              </div>
+            </button>
+          `).join('')}
+        </div>
+      ` : ''}
+    `;
+  }
+  if (state.addMode === 'quick') {
+    return `
+      <input id="quick-input" class="field" type="text" value="${esc(state.quickInput)}" placeholder='e.g. "2 scrambled eggs and toast"' oninput="state.quickInput = this.value" onkeydown="if(event.key==='Enter') handleQuick()" ${state.analyzing ? 'disabled' : ''} autofocus/>
+      <div class="small muted mt-2">One-shot AI estimate. Include portions.</div>
+      <button class="btn btn-primary mt-4" onclick="handleQuick()" ${state.analyzing || !state.quickInput.trim() ? 'disabled' : ''}>
+        ${state.analyzing ? `${icon('loader', 18, 'currentColor', 2, 'spin')} Analyzing…` : `${icon('check', 18)} Add to log`}
+      </button>
+    `;
+  }
+  if (state.addMode === 'photo') {
+    return `
+      <div class="mb-3">
+        <label class="field-label">Servings eaten</label>
+        <input class="field" type="number" step="0.25" min="0.25" value="${esc(state.servings)}" oninput="state.servings = this.value"/>
+      </div>
+      <input id="photo-input" type="file" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this.files[0])"/>
+      <input id="photo-input-lib" type="file" accept="image/*" style="display:none" onchange="handlePhoto(this.files[0])"/>
+      <div class="grid2">
+        <button class="photo-btn" onclick="document.getElementById('photo-input').click()" ${state.analyzing ? 'disabled' : ''}>
+          ${state.analyzing ? `${icon('loader', 24, '#d4ff3f', 2, 'spin')}<span style="font-size:12px">Reading…</span>` : `${icon('camera', 22)}<span style="font-size:12px;font-weight:500">Take photo</span>`}
+        </button>
+        <button class="photo-btn" onclick="document.getElementById('photo-input-lib').click()" ${state.analyzing ? 'disabled' : ''}>
+          ${icon('image', 22)}<span style="font-size:12px;font-weight:500">From library</span>
+        </button>
+      </div>
+      <div class="small muted mt-2">Set servings first, then choose how to upload.</div>
+    `;
+  }
+  if (state.addMode === 'meals') {
+    return renderMealsTab();
+  }
+  if (state.addMode === 'sauce') {
+    return renderSauceTab();
+  }
+  if (state.addMode === 'manual') {
+    const cat = state.manual.category || inferCategory(new Date().toISOString());
+    return `
+      <div class="space-y-3">
+        <div>
+          <label class="field-label">Food name</label>
+          <input id="manual-name" class="field" type="text" value="${esc(state.manual.name)}" placeholder="e.g. Protein shake" oninput="state.manual.name = this.value" autofocus/>
+        </div>
+        <div>
+          <label class="field-label">Calories</label>
+          <input id="manual-cal" class="field" type="number" inputmode="numeric" value="${esc(state.manual.calories)}" placeholder="0" oninput="state.manual.calories = this.value"/>
+        </div>
+        <div class="grid3">
+          ${['protein', 'carbs', 'fat'].map(k => `
+            <div>
+              <label class="field-label">${k[0].toUpperCase() + k.slice(1)}</label>
+              <div class="field-wrap">
+                <input class="field" type="number" inputmode="numeric" value="${esc(state.manual[k])}" placeholder="0" oninput="state.manual.${k} = this.value"/>
+                <span class="field-suffix">g</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div>
+          <label class="field-label">Meal</label>
+          <div class="segments">
+            ${Object.entries(CATEGORIES).map(([k, v]) => `
+              <button class="seg ${cat === k ? 'active' : ''}" onclick="state.manual.category='${k}'; render()">${v.label}</button>
+            `).join('')}
+          </div>
+        </div>
+        <div>
+          <label class="field-label">Notes <span class="muted" style="letter-spacing:0;text-transform:none">(optional)</span></label>
+          <textarea id="manual-notes" class="field" rows="2" placeholder="cheat meal, post-workout, etc." oninput="state.manual.notes = this.value">${esc(state.manual.notes)}</textarea>
+        </div>
+        <button class="btn btn-primary" onclick="handleManualAdd()" style="margin-top:4px">
+          ${icon('check', 18)} Add to log
+        </button>
+      </div>
+    `;
+  }
+}
+
+// =====================
+// RENDER: EDIT/EXERCISE/WEIGHT/SETTINGS MODALS (mostly unchanged)
+// =====================
+function renderMealsTab() {
+  if (state.savedMeals.length === 0) {
+    return `
+      <div class="empty-state" style="padding:24px">
+        ${icon('journal', 22, '#525252', 2)}
+        <div class="dim mt-2" style="font-size:13px">No saved meals yet.</div>
+        <div class="small muted mt-1" style="line-height:1.5">Build your usual breakfast, your go-to lunch, etc. Tap once to log the whole stack.</div>
+      </div>
+      <button class="btn btn-primary mt-4" onclick="openMealBuilder()">${icon('plus', 18)} Build a saved meal</button>
+    `;
+  }
+  return `
+    <div class="space-y-2">
+      ${state.savedMeals.map(m => {
+        const totals = m.items.reduce((a, f) => ({
+          cal: a.cal + (f.calories || 0),
+          p: a.p + (f.protein || 0),
+          c: a.c + (f.carbs || 0),
+          f: a.f + (f.fat || 0),
+        }), { cal: 0, p: 0, c: 0, f: 0 });
+        const cat = m.category ? CATEGORIES[m.category] : null;
+        return `
+          <div class="card" style="padding:12px">
+            <div class="row between mb-1">
+              <div class="flex1">
+                <div class="row" style="gap:8px;align-items:center">
+                  ${cat ? `<div class="cat-dot" style="background:${cat.color}"></div>` : ''}
+                  <div style="font-weight:600;font-size:14px">${esc(m.name)}</div>
+                </div>
+                <div class="small mono muted mt-1">
+                  ${m.items.length} item${m.items.length !== 1 ? 's' : ''} · <span class="lime">${totals.cal}</span> cal · P${totals.p} C${totals.c} F${totals.f}
+                </div>
+              </div>
+              <button onclick="event.stopPropagation(); editSavedMeal(${m.id})" style="padding:6px;color:#737373" title="Edit">${icon('edit', 14)}</button>
+            </div>
+            <button class="btn btn-primary" style="padding:10px;font-size:13px;margin-top:6px" onclick="logSavedMeal(${m.id})">
+              ${icon('plus', 14)} Log this meal
+            </button>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    <button class="btn btn-secondary mt-4" onclick="openMealBuilder()">${icon('plus', 16)} New saved meal</button>
+  `;
+}
+
+function renderSauceTab() {
+  const allCondiments = [...state.customCondiments, ...DEFAULT_CONDIMENTS];
+  const needsKey = !state.apiKey;
+  return `
+    <div class="small muted mb-3" style="line-height:1.5">Quick-add the calories that sneak in. One tap logs as a snack.</div>
+
+    ${!needsKey ? `
+      <div class="mb-4">
+        <div class="field-wrap">
+          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);z-index:1">${icon('search', 17, '#737373')}</span>
+          <input id="condiment-search" class="field" type="text" value="${esc(state.condimentSearch)}" placeholder='Try "Chick-fil-A sauce"' oninput="state.condimentSearch = this.value" onkeydown="if(event.key==='Enter') handleCondimentSearch()" style="padding-left:44px" ${state.analyzing ? 'disabled' : ''}/>
+        </div>
+        <button class="btn btn-secondary mt-2" onclick="handleCondimentSearch()" ${state.analyzing || !state.condimentSearch.trim() ? 'disabled' : ''} style="padding:10px;font-size:13px">
+          ${state.analyzing ? `${icon('loader', 14, 'currentColor', 2, 'spin')} Searching…` : `${icon('sparkles', 14)} Find brand/restaurant sauce`}
+        </button>
+        ${state.condimentSearchResults.length > 0 ? `
+          <div class="space-y-2 mt-3">
+            <div class="tiny mono">Tap to log, or hold-pin to save</div>
+            ${state.condimentSearchResults.map((r, i) => `
+              <div class="result" style="padding:10px">
+                <div class="row between">
+                  <div class="flex1" onclick="logCondimentResult(${i})" style="cursor:pointer">
+                    <div style="font-weight:500;font-size:13px">${esc(r.name)}</div>
+                    <div class="small mono muted" style="margin-top:2px">
+                      <span class="lime">${r.calories}</span> cal · P${r.protein} C${r.carbs} F${r.fat}
+                    </div>
+                  </div>
+                  <button onclick="pinCondimentResult(${i})" style="padding:6px 10px;font-size:11px;color:#d4ff3f;border:1px solid rgba(212,255,63,0.3);border-radius:6px;margin-left:8px" title="Pin to custom list">${icon('plus', 12, '#d4ff3f')} Pin</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+        ${state.error ? `<div class="error">${esc(state.error)}</div>` : ''}
+      </div>
+      <div style="border-top:1px solid #262626;padding-top:12px">
+        <div class="tiny mono mb-2">Quick list</div>
+      </div>
+    ` : ''}
+
+    <div class="space-y-2">
+      ${allCondiments.map((c, i) => `
+        <button class="result" onclick="logCondiment(${i})">
+          <div class="row between">
+            <div class="flex1">
+              <div style="font-weight:500;font-size:14px">${esc(c.name)}</div>
+              <div class="small mono muted" style="margin-top:2px">
+                <span class="lime">${c.calories}</span> cal · P${c.protein} C${c.carbs} F${c.fat}
+              </div>
+            </div>
+            ${i < state.customCondiments.length ? `<button onclick="event.stopPropagation(); deleteCustomCondiment(${i})" style="padding:4px;color:#525252">${icon('trash', 13)}</button>` : ''}
+          </div>
+        </button>
+      `).join('')}
+    </div>
+    <button class="btn btn-secondary mt-4" onclick="state.showCustomCondiment = !state.showCustomCondiment; render()">
+      ${icon(state.showCustomCondiment ? 'x' : 'plus', 16)} ${state.showCustomCondiment ? 'Cancel' : 'Add custom condiment'}
+    </button>
+    ${state.showCustomCondiment ? `
+      <div class="card mt-3" style="padding:12px">
+        <div>
+          <label class="field-label">Name</label>
+          <input class="field" type="text" value="${esc(state.condimentDraft.name)}" placeholder="e.g. Chick-fil-A sauce (1 packet)" oninput="state.condimentDraft.name = this.value"/>
+        </div>
+        <div class="mt-3">
+          <label class="field-label">Calories</label>
+          <input class="field" type="number" inputmode="numeric" value="${esc(state.condimentDraft.calories)}" placeholder="0" oninput="state.condimentDraft.calories = this.value"/>
+        </div>
+        <div class="grid3 mt-3">
+          ${['protein', 'carbs', 'fat'].map(k => `
+            <div>
+              <label class="field-label">${k[0].toUpperCase() + k.slice(1)}</label>
+              <div class="field-wrap"><input class="field" type="number" inputmode="numeric" value="${esc(state.condimentDraft[k])}" placeholder="0" oninput="state.condimentDraft.${k} = this.value"/><span class="field-suffix">g</span></div>
+            </div>
+          `).join('')}
+        </div>
+        <button class="btn btn-primary mt-3" onclick="saveCustomCondiment()">${icon('check', 16)} Save condiment</button>
+      </div>
+    ` : ''}
+  `;
+}
+
+function renderMealBuilderModal() {
+  const m = state.mealBuilder;
+  const totals = m.items.reduce((a, f) => ({
+    cal: a.cal + (f.calories || 0),
+    p: a.p + (f.protein || 0),
+    c: a.c + (f.carbs || 0),
+    f: a.f + (f.fat || 0),
+  }), { cal: 0, p: 0, c: 0, f: 0 });
+  return `
+    <div class="overlay" onclick="if(event.target===this) closeModal()">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h3 class="display">${state.editingMealId ? 'Edit' : 'New'} meal</h3>
+          <button onclick="closeModal()" class="muted" style="padding:4px">${icon('x', 20)}</button>
+        </div>
+        <div class="sheet-body">
+          <div class="space-y-3">
+            <div>
+              <label class="field-label">Meal name</label>
+              <input class="field" type="text" value="${esc(m.name)}" placeholder="e.g. Usual breakfast" oninput="state.mealBuilder.name = this.value"/>
+            </div>
+            <div>
+              <label class="field-label">Default meal slot <span class="muted" style="letter-spacing:0;text-transform:none">(optional)</span></label>
+              <div class="segments" style="grid-template-columns:repeat(5,1fr)">
+                <button class="seg ${!m.category ? 'active' : ''}" onclick="state.mealBuilder.category=''; render()">Auto</button>
+                ${Object.entries(CATEGORIES).map(([k, v]) => `<button class="seg ${m.category === k ? 'active' : ''}" onclick="state.mealBuilder.category='${k}'; render()">${v.label}</button>`).join('')}
+              </div>
+            </div>
+          </div>
+
+          <div class="row between mt-4 mb-2">
+            <div class="tiny mono">Items (${m.items.length})</div>
+            <div class="small mono"><span class="lime">${totals.cal}</span> cal · P${totals.p} C${totals.c} F${totals.f}</div>
+          </div>
+          ${m.items.length === 0 ? `
+            <div class="empty-state" style="padding:16px">
+              <div class="small muted">No items yet. Add foods below.</div>
+            </div>
+          ` : `
+            <div class="space-y-2">
+              ${m.items.map((it, i) => `
+                <div class="card" style="padding:10px;display:flex;align-items:center;gap:10px">
+                  <div class="flex1">
+                    <div style="font-weight:500;font-size:13px" class="truncate">${esc(it.name)}</div>
+                    <div class="small mono muted">${it.calories} cal · P${it.protein} C${it.carbs} F${it.fat}</div>
+                  </div>
+                  <button onclick="removeMealItem(${i})" style="padding:6px;color:#525252">${icon('trash', 13)}</button>
+                </div>
+              `).join('')}
+            </div>
+          `}
+
+          <div class="tiny mono mt-4 mb-2">Add item from</div>
+          ${state.recents.length > 0 ? `
+            <div class="row hscroll" style="gap:8px;margin:0 -20px;padding:0 20px 4px">
+              ${state.recents.map((r, i) => `
+                <button class="pill" onclick="addToMealBuilder(${i})">
+                  <div class="truncate" style="font-size:12px;font-weight:500;color:#e5e5e5;max-width:140px">${esc(r.name)}</div>
+                  <div class="small mono muted">${r.calories} cal</div>
+                </button>
+              `).join('')}
+            </div>
+          ` : `<div class="small muted">Log a few foods first to populate your recents — then add them here.</div>`}
+
+          <div class="row" style="gap:8px;margin-top:16px">
+            ${state.editingMealId ? `<button class="btn btn-danger" onclick="deleteSavedMeal()" style="flex:0 0 auto;padding:14px 16px">${icon('trash', 16)}</button>` : ''}
+            <button class="btn btn-primary" style="flex:1" onclick="saveMealBuilder()" ${!m.name.trim() || m.items.length === 0 ? 'disabled' : ''}>
+              ${icon('check', 18)} Save meal
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+
+function renderPreLogModal() {
+  const d = state.preLogDraft;
+  if (!d) return '';
+  const cat = d.category || inferCategory(new Date().toISOString());
+  return `
+    <div class="overlay" onclick="if(event.target===this) closeModal()">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h3 class="display">Check & log</h3>
+          <button onclick="closeModal()" class="muted" style="padding:4px">${icon('x', 20)}</button>
+        </div>
+        <div class="sheet-body">
+          <div class="small muted mb-3">Edit values if the estimate looks off, then save.</div>
+          <div class="space-y-3">
+            <div>
+              <label class="field-label">Food</label>
+              <input class="field" type="text" value="${esc(d.name)}" oninput="state.preLogDraft.name = this.value"/>
+            </div>
+            <div>
+              <label class="field-label">Calories</label>
+              <input class="field" type="number" inputmode="numeric" value="${esc(d.calories)}" oninput="state.preLogDraft.calories = parseFloat(this.value) || 0"/>
+            </div>
+            <div class="grid3">
+              ${['protein', 'carbs', 'fat'].map(k => `
+                <div>
+                  <label class="field-label">${k[0].toUpperCase() + k.slice(1)}</label>
+                  <div class="field-wrap"><input class="field" type="number" inputmode="numeric" value="${esc(d[k])}" oninput="state.preLogDraft.${k} = parseFloat(this.value) || 0"/><span class="field-suffix">g</span></div>
+                </div>
+              `).join('')}
+            </div>
+            <div>
+              <label class="field-label">Meal</label>
+              <div class="segments">
+                ${Object.entries(CATEGORIES).map(([k, v]) => `<button class="seg ${cat === k ? 'active' : ''}" onclick="state.preLogDraft.category='${k}'; render()">${v.label}</button>`).join('')}
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary mt-4" onclick="confirmPreLog()">${icon('check', 18)} Add to log</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+
+function renderEditModal() {
+  const d = state.editDraft;
+  if (!d) return '';
+  const cat = d.category || 'snack';
+  return `
+    <div class="overlay" onclick="if(event.target===this) closeModal()">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h3 class="display">Edit food</h3>
+          <button onclick="closeModal()" class="muted" style="padding:4px">${icon('x', 20)}</button>
+        </div>
+        <div class="sheet-body">
+          <div class="space-y-3">
+            <div><label class="field-label">Name</label><input id="edit-name" class="field" type="text" value="${esc(d.name)}" oninput="state.editDraft.name = this.value"/></div>
+            <div><label class="field-label">Calories</label><input class="field" type="number" inputmode="numeric" value="${esc(d.calories)}" oninput="state.editDraft.calories = this.value"/></div>
+            <div class="grid3">
+              ${['protein', 'carbs', 'fat'].map(k => `
+                <div>
+                  <label class="field-label">${k[0].toUpperCase() + k.slice(1)}</label>
+                  <div class="field-wrap"><input class="field" type="number" inputmode="numeric" value="${esc(d[k])}" oninput="state.editDraft.${k} = this.value"/><span class="field-suffix">g</span></div>
+                </div>
+              `).join('')}
+            </div>
+            <div>
+              <label class="field-label">Meal</label>
+              <div class="segments">
+                ${Object.entries(CATEGORIES).map(([k, v]) => `<button class="seg ${cat === k ? 'active' : ''}" onclick="state.editDraft.category='${k}'; render()">${v.label}</button>`).join('')}
+              </div>
+            </div>
+            <div><label class="field-label">Notes</label><textarea class="field" rows="2" placeholder="cheat meal, etc." oninput="state.editDraft.notes = this.value">${esc(d.notes || '')}</textarea></div>
+          </div>
+          <button class="btn btn-primary mt-4" onclick="saveEdit()">${icon('check', 18)} Save changes</button>
+          <button class="btn btn-danger mt-3" onclick="deleteFromEdit()">${icon('trash', 16)} Delete entry</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function renderExerciseModal() {
+  const d = state.exerciseDraft;
+  const needsKey = !state.apiKey;
+  return `
+    <div class="overlay" onclick="if(event.target===this && !state.analyzing) closeModal()">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h3 class="display">Log exercise</h3>
+          <button onclick="if(!state.analyzing) closeModal()" class="muted" style="padding:4px">${icon('x', 20)}</button>
+        </div>
+        <div class="sheet-body">
+          ${state.exerciseRecents.length > 0 ? `
+            <div class="mb-3">
+              <div class="row mb-2" style="gap:6px">${icon('history', 12, '#737373')}<div class="tiny mono">Recent</div></div>
+              <div class="row hscroll" style="gap:8px;margin:0 -20px;padding:0 20px 4px">
+                ${state.exerciseRecents.map((e, i) => `
+                  <button class="pill" onclick="addExerciseFromRecent(${i})" ${state.analyzing ? 'disabled' : ''}>
+                    <div class="truncate" style="font-size:12px;font-weight:500;color:#e5e5e5;max-width:140px">${esc(e.name)}</div>
+                    <div class="small mono muted">-${e.calories} cal</div>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+          <div class="space-y-3">
+            <div><label class="field-label">Activity</label><input id="ex-name" class="field" type="text" value="${esc(d.name)}" placeholder='e.g. "30 min jog"' oninput="state.exerciseDraft.name = this.value" autofocus/></div>
+            ${!needsKey ? `
+              <button class="btn btn-secondary" onclick="handleExerciseEstimate()" ${state.analyzing || !d.name.trim() ? 'disabled' : ''}>
+                ${state.analyzing ? `${icon('loader', 16, 'currentColor', 2, 'spin')} Estimating…` : `${icon('sparkles', 16)} Estimate & add`}
+              </button>
+              <div class="tiny mono muted" style="text-align:center">— or enter manually —</div>
+            ` : ''}
+            <div class="grid2">
+              <div><label class="field-label">Cal burned</label><input class="field" type="number" inputmode="numeric" value="${esc(d.calories)}" placeholder="0" oninput="state.exerciseDraft.calories = this.value"/></div>
+              <div><label class="field-label">Duration</label><div class="field-wrap"><input class="field" type="number" inputmode="numeric" value="${esc(d.duration)}" placeholder="0" oninput="state.exerciseDraft.duration = this.value"/><span class="field-suffix">min</span></div></div>
+            </div>
+            <button class="btn btn-primary" onclick="handleExerciseManual()">${icon('check', 18)} Add to log</button>
+          </div>
+          ${state.error ? `<div class="error">${esc(state.error)}</div>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+function renderWeightModal() {
+  return `
+    <div class="overlay" onclick="if(event.target===this) closeModal()">
+      <div class="sheet" style="max-height:unset">
+        <div class="sheet-head">
+          <h3 class="display">Log weight</h3>
+          <button onclick="closeModal()" class="muted" style="padding:4px">${icon('x', 20)}</button>
+        </div>
+        <div class="sheet-body">
+          <input id="weight-input" class="field display" type="number" step="0.1" value="${esc(state.newWeight)}" placeholder="244.0" oninput="state.newWeight = this.value; updateWeightButton()" style="font-size:26px;text-align:center;padding:16px" autofocus/>
+          <div class="tiny mono" style="text-align:center;margin-top:4px">lbs · today</div>
+          <button id="weight-save-btn" class="btn btn-primary mt-4" onclick="saveWeight()" ${!state.newWeight ? 'disabled' : ''}>Save</button>
+          <div id="weight-error" class="error" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function renderSettingsModal() {
+  const s = state.settingsDraft || state.settings;
+  const k = state.settingsKeyDraft;
+  return `
+    <div class="overlay" onclick="if(event.target===this) closeModal()">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h3 class="display">Settings</h3>
+          <button onclick="closeModal()" class="muted" style="padding:4px">${icon('x', 20)}</button>
+        </div>
+        <div class="sheet-body">
+          <div class="space-y-4">
+            ${field('Daily calories', 'calorieTarget', s.calorieTarget, 'cal')}
+            <div class="grid3">
+              ${field('Protein', 'proteinTarget', s.proteinTarget, 'g', true)}
+              ${field('Carbs', 'carbsTarget', s.carbsTarget, 'g', true)}
+              ${field('Fat', 'fatTarget', s.fatTarget, 'g', true)}
+            </div>
+            <div style="border-top:1px solid #262626;padding-top:16px" class="space-y-4">
+              <div class="grid2">
+                ${field('Water target', 'waterTarget', s.waterTarget, 'oz', true)}
+                ${field('Glass size', 'glassSize', s.glassSize, 'oz', true)}
+              </div>
+            </div>
+            <div style="border-top:1px solid #262626;padding-top:16px" class="space-y-4">
+              ${field('Start weight', 'startWeight', s.startWeight, 'lbs')}
+              ${field('Goal weight', 'goalWeight', s.goalWeight, 'lbs')}
+              <div class="grid2">
+                ${field('Plateau low', 'plateauLow', s.plateauLow, 'lbs', true)}
+                ${field('Plateau high', 'plateauHigh', s.plateauHigh, 'lbs', true)}
+              </div>
+            </div>
+            <div style="border-top:1px solid #262626;padding-top:16px">
+              <div class="row mb-2" style="gap:6px">${icon('key', 13, '#d4ff3f')}<label class="tiny mono" style="color:#a3a3a3">Anthropic API key <span class="muted">(this device)</span></label></div>
+              <div class="field-wrap">
+                <input id="apikey-input" class="field mono" type="${state.showKey ? 'text' : 'password'}" value="${esc(k)}" placeholder="sk-ant-..." oninput="state.settingsKeyDraft = this.value" style="font-size:13px;padding-right:60px"/>
+                <button onclick="state.showKey = !state.showKey; render()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:10px;color:#737373;padding:4px 8px" class="mono">${state.showKey ? 'HIDE' : 'SHOW'}</button>
+              </div>
+              <div class="small muted mt-2">Needed for AI features. Stays on this device (not synced).</div>
+            </div>
+            <div style="border-top:1px solid #262626;padding-top:16px">
+              <div class="tiny mono mb-2">Account</div>
+              <div class="small dim mb-3">Signed in as <span class="mono" style="color:#d4d4d4">${esc(state.user?.email || '—')}</span></div>
+              ${state.migrationPrompt ? `<button class="btn btn-secondary mb-2" onclick="migrateLocalToCloud()">${icon('sparkles', 14)} Import local data</button>` : ''}
+              <button class="btn btn-danger" onclick="signOut()">${icon('x', 14)} Sign out</button>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:24px">Save</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function field(label, key, value, suffix, small) {
+  return `<div>
+    <label class="field-label">${label}</label>
+    <div class="field-wrap">
+      <input class="field" type="number" value="${esc(value)}" oninput="updateSettingsDraft('${key}', this.value)" style="${small ? 'padding:10px 12px;font-size:15px' : ''}"/>
+      ${suffix ? `<span class="field-suffix">${suffix}</span>` : ''}
+    </div>
+  </div>`;
+}
+
+// =====================
+// RENDER: PLATEAU NOTE MODAL
+// =====================
+function renderPlateauNoteModal() {
+  const d = state.plateauDraft;
+  const cw = state.weights.length ? state.weights[state.weights.length - 1].weight : state.settings.startWeight;
+  return `
+    <div class="overlay" onclick="if(event.target===this) closeModal()">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h3 class="display">Plateau journal</h3>
+          <button onclick="closeModal()" class="muted" style="padding:4px">${icon('x', 20)}</button>
+        </div>
+        <div class="sheet-body">
+          <div class="card" style="padding:12px;margin-bottom:16px;text-align:center">
+            <div class="tiny mono">Current</div>
+            <div class="display" style="font-size:24px;margin-top:4px">${cw} <span class="muted" style="font-size:14px;font-weight:400">lbs</span></div>
+          </div>
+          <div>
+            <label class="field-label">What's different this week?</label>
+            <div class="chip-group">
+              ${TRIGGERS.map(t => `
+                <button class="chip ${d.triggers.includes(t) ? 'active' : ''}" onclick="toggleTrigger('${t}')">${t}</button>
+              `).join('')}
+            </div>
+          </div>
+          <div class="mt-4">
+            <label class="field-label">Notes</label>
+            <textarea class="field" rows="4" placeholder="What are you noticing? What might break the pattern?" oninput="state.plateauDraft.notes = this.value">${esc(d.notes)}</textarea>
+          </div>
+          <button class="btn btn-primary mt-4" onclick="savePlateauNote()">${icon('check', 18)} Save entry</button>
+          ${state.plateauNotes.length > 0 ? `<button class="btn btn-secondary mt-3" onclick="openModal('plateauHistory')">${icon('history', 16)} View past entries (${state.plateauNotes.length})</button>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderPlateauHistoryModal() {
+  const sorted = [...state.plateauNotes].sort((a, b) => b.date.localeCompare(a.date));
+  return `
+    <div class="overlay" onclick="if(event.target===this) closeModal()">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h3 class="display">Journal history</h3>
+          <button onclick="closeModal()" class="muted" style="padding:4px">${icon('x', 20)}</button>
+        </div>
+        <div class="sheet-body">
+          ${sorted.length === 0 ? `<div class="small muted" style="text-align:center;padding:20px">No entries yet.</div>` : `
+            <div class="space-y-3">
+              ${sorted.map(n => `
+                <div class="card" style="padding:14px">
+                  <div class="row between mb-2">
+                    <div class="tiny mono">${fmtDateShort(n.date)}</div>
+                    <div class="small mono" style="color:#fcd34d">${n.weight} lbs</div>
+                  </div>
+                  ${n.triggers.length ? `<div class="chip-group mb-2">${n.triggers.map(t => `<span class="chip active" style="font-size:10px;padding:3px 8px">${esc(t)}</span>`).join('')}</div>` : ''}
+                  ${n.notes ? `<div class="small" style="color:#d4d4d4;line-height:1.5">${esc(n.notes)}</div>` : ''}
+                  <button onclick="deletePlateauNote(${n.id})" style="margin-top:8px;font-size:11px;color:#525252">Delete</button>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// =====================
+// RENDER: BREAK GLASS MODAL
+// =====================
+function renderBreakGlassModal() {
+  const c = computed();
+  const startWeight = state.settings.startWeight;
+  const totalLost = (startWeight - c.currentWeight).toFixed(1);
+  const toGo = (c.currentWeight - state.settings.goalWeight).toFixed(1);
+  const pctDone = ((startWeight - c.currentWeight) / (startWeight - state.settings.goalWeight) * 100).toFixed(0);
+
+  return `
+    <div class="overlay" onclick="if(event.target===this) closeModal()">
+      <div class="sheet" style="max-width:400px">
+        <div class="sheet-head" style="border:none">
+          <div></div>
+          <button onclick="closeModal()" class="muted" style="padding:4px">${icon('x', 20)}</button>
+        </div>
+        <div class="bg-content">
+          <div class="tiny mono mb-2" style="color:#fb923c">Anchor point</div>
+          <div class="display" style="font-size:24px;color:#d4d4d4;margin-bottom:8px">You're already</div>
+          <div class="bg-hero">${totalLost}</div>
+          <div class="tiny mono">lbs down from ${startWeight}</div>
+
+          <div class="bg-line"></div>
+
+          <div class="bg-stat">
+            <div class="bg-stat-val" style="color:${c.streak > 0 ? '#d4ff3f' : '#737373'}">${c.streak}</div>
+            <div class="bg-stat-label">${c.streak === 1 ? 'day' : 'day'} streak</div>
+          </div>
+
+          <div class="bg-stat">
+            <div class="bg-stat-val" style="color:#60a5fa">${pctDone}%</div>
+            <div class="bg-stat-label">of the way there</div>
+          </div>
+
+          <div class="bg-stat">
+            <div class="bg-stat-val">${toGo}</div>
+            <div class="bg-stat-label">lbs to ${state.settings.goalWeight}</div>
+          </div>
+
+          <div class="bg-line"></div>
+
+          <p style="font-size:14px;color:#a3a3a3;line-height:1.6;margin:16px 0 24px">
+            You've done the hard part. This moment is why the app exists. Close the kitchen. Drink a glass of water. Go to bed early. You'll wake up tomorrow glad you did.
+          </p>
+
+          <button class="btn btn-secondary" onclick="addWater(${state.settings.glassSize || 8}); closeModal()">${icon('droplet', 16, '#22d3ee')} Pour a glass instead</button>
+          <button class="btn btn-primary mt-3" onclick="closeModal()">I'm good</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// =====================
+// RENDER: WEEKLY REVIEW MODAL
+// =====================
+function renderWeeklyReviewModal() {
+  const w = computeWeekly();
+  const target = state.settings.calorieTarget;
+  return `
+    <div class="overlay" onclick="if(event.target===this) closeModal()">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h3 class="display">Last 7 days</h3>
+          <button onclick="closeModal()" class="muted" style="padding:4px">${icon('x', 20)}</button>
+        </div>
+        <div class="sheet-body">
+          <div class="grid2 mb-4">
+            <div class="card" style="padding:14px">
+              <div class="tiny mono mb-1">Days on target</div>
+              <div class="display" style="font-size:24px">${w.underTarget}<span class="muted" style="font-size:14px;font-weight:400">/${w.loggedDays}</span></div>
+            </div>
+            <div class="card" style="padding:14px">
+              <div class="tiny mono mb-1">Weight change</div>
+              <div class="display" style="font-size:24px;color:${w.weightChange === null ? '#737373' : parseFloat(w.weightChange) < 0 ? '#d4ff3f' : '#ff8a80'}">
+                ${w.weightChange === null ? '—' : (parseFloat(w.weightChange) > 0 ? '+' : '') + w.weightChange}
+                <span class="muted" style="font-size:14px;font-weight:400">lbs</span>
+              </div>
+            </div>
+            <div class="card" style="padding:14px">
+              <div class="tiny mono mb-1">Avg daily cal</div>
+              <div class="display" style="font-size:24px">${Math.round(w.avgCal)}</div>
+              <div class="small mono muted mt-1">target ${target}</div>
+            </div>
+            <div class="card" style="padding:14px">
+              <div class="tiny mono mb-1">Cal burned</div>
+              <div class="display" style="font-size:24px;color:#86efac">${w.totalBurned}</div>
+              <div class="small mono muted mt-1">Avg water ${Math.round(w.avgWater)} oz</div>
+            </div>
+          </div>
+
+          <div class="tiny mono mb-2">By day</div>
+          <div class="space-y-2">
+            ${w.days.map(d => {
+              const under = d.logCount > 0 && d.cals <= target;
+              const logged = d.logCount > 0;
+              const dotColor = !logged ? '#404040' : under ? '#d4ff3f' : '#ff5a4a';
+              return `
+                <div class="wr-day">
+                  <div class="wr-dot" style="background:${dotColor}"></div>
+                  <div class="flex1">
+                    <div class="small" style="font-weight:500">${formatDateLabel(d.date)}</div>
+                    <div class="small mono muted">${logged ? `${d.cals} cal${d.burned ? ` · -${d.burned} burned` : ''}` : 'No food logged'}</div>
+                  </div>
+                  ${logged ? `<div class="small mono" style="color:${under ? '#86efac' : '#ff8a80'}">${under ? 'UNDER' : 'OVER'}</div>` : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// =====================
+// RENDER: PHOTO MODALS
+// =====================
+function renderPhotoCompareModal() {
+  const sel = state.photoCompareSelection;
+  return `
+    <div class="overlay" onclick="if(event.target===this) closeModal()">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h3 class="display">Compare photos</h3>
+          <button onclick="closeModal()" class="muted" style="padding:4px">${icon('x', 20)}</button>
+        </div>
+        <div class="sheet-body">
+          ${sel.length === 2 ? `
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+              ${sel.map(id => {
+                const p = state.photos.find(x => x.id === id);
+                return p ? `
+                  <div>
+                    <div class="photo-thumb" style="aspect-ratio:auto;border-radius:12px"><img src="${p.dataUrl}" style="border-radius:12px"/></div>
+                    <div class="tiny mono" style="text-align:center;margin-top:6px">${fmtDateShort(p.date)}</div>
+                  </div>
+                ` : '';
+              }).join('')}
+            </div>
+            <button class="btn btn-secondary" onclick="state.photoCompareSelection = []; render()">Clear selection</button>
+          ` : `
+            <div class="small muted mb-3">Tap two photos to compare.</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+              ${state.photos.slice().reverse().map(p => {
+                const selected = sel.includes(p.id);
+                return `
+                  <button class="photo-thumb" onclick="togglePhotoSelect(${p.id})">
+                    <img src="${p.dataUrl}"/>
+                    ${selected ? `<div class="photo-thumb-sel">${icon('check', 12, '#d4ff3f', 2.5)}</div>` : ''}
+                    <div class="photo-thumb-label">${fmtDateShort(p.date)}</div>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderPhotoViewModal() {
+  const p = state.photos.find(x => x.id === state.viewingPhotoId);
+  if (!p) return '';
+  return `
+    <div class="overlay" onclick="if(event.target===this) closeModal()">
+      <div class="sheet" style="max-width:500px">
+        <div class="sheet-head">
+          <h3 class="display" style="font-size:18px">${fmtDateShort(p.date)}</h3>
+          <button onclick="closeModal()" class="muted" style="padding:4px">${icon('x', 20)}</button>
+        </div>
+        <div class="sheet-body">
+          <img src="${p.dataUrl}" style="width:100%;border-radius:12px;display:block"/>
+          <button class="btn btn-danger mt-3" onclick="deletePhoto(${p.id})">${icon('trash', 16)} Delete photo</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// =====================
+// RENDER ORCHESTRATION
+// =====================
+const root = document.getElementById('root');
+function render() {
+  const active = document.activeElement;
+  const focusedId = active?.id;
+  const selStart = active?.selectionStart;
+  const selEnd = active?.selectionEnd;
+  if (!state.authReady) {
+    root.innerHTML = renderBoot();
+  } else if (!state.user) {
+    root.innerHTML = renderAuth();
+  } else if (state.loadingCloud) {
+    root.innerHTML = renderBoot('Loading your data…');
+  } else {
+    root.innerHTML = renderMain();
+  }
+  if (focusedId) {
+    const el = document.getElementById(focusedId);
+    if (el) {
+      el.focus();
+      if (selStart != null && typeof el.setSelectionRange === 'function') {
+        try { el.setSelectionRange(selStart, selEnd); } catch {}
+      }
+    }
+  }
+}
+
+// =====================
+// ACTIONS
+// =====================
+function switchAuthMode() {
+  state.authMode = state.authMode === 'signin' ? 'signup' : 'signin';
+  state.authError = '';
+  render();
+}
+
+async function handleAuth() {
+  const email = state.authEmail.trim().toLowerCase();
+  const password = state.authPassword;
+  if (!email || password.length < 6) return;
+  state.authBusy = true; state.authError = ''; render();
+  try {
+    if (state.authMode === 'signup') {
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if (error) throw error;
+      if (!data.session) {
+        state.authError = 'Account created. Please check your email to confirm (if required) and then sign in.';
+        state.authMode = 'signin';
+        state.authPassword = '';
+      } else {
+        await onSignedIn(data.user);
+      }
+    } else {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      await onSignedIn(data.user);
+    }
+  } catch (e) {
+    state.authError = e.message || 'Auth failed.';
+  } finally {
+    state.authBusy = false;
+    render();
+  }
+}
+
+async function handleForgotPassword() {
+  const email = state.authEmail.trim().toLowerCase();
+  if (!email) {
+    state.authError = 'Enter your email above first, then tap Forgot password.';
+    render();
+    return;
+  }
+  try {
+    const { error } = await sb.auth.resetPasswordForEmail(email);
+    if (error) throw error;
+    state.authError = `Password reset email sent to ${email}. Check your inbox.`;
+  } catch (e) {
+    state.authError = e.message || 'Could not send reset email.';
+  }
+  render();
+}
+
+async function onSignedIn(user) {
+  state.user = user;
+  state.authEmail = '';
+  state.authPassword = '';
+  state.authError = '';
+  state.loadingCloud = true;
+  render();
+  try {
+    const data = await cloudLoadAll(user.id);
+    if (data.settings) state.settings = { ...DEFAULT_SETTINGS, ...data.settings };
+    state.weights = data.weights || [];
+    state.recents = data.recents || [];
+    state.exerciseRecents = data.exerciseRecents || [];
+    state.plateauNotes = data.plateauNotes || [];
+    state.commitments = data.commitments || {};
+    state.photos = data.photos || [];
+    state.savedMeals = data.savedMeals || [];
+    state.customCondiments = data.customCondiments || [];
+    // Check if there's local data to offer migration
+    state.migrationPrompt = hasLegacyLocalData() && (state.weights.length === 0);
+    await loadDay(todayKey());
+    refreshWeeklyCache();
+    // Process any incoming URL parameters (e.g. from Apple Shortcuts)
+    await handleUrlParams();
+  } catch (e) {
+    console.error('Data load failed', e);
+    alert('Could not load your data: ' + e.message);
+  } finally {
+    state.loadingCloud = false;
+    render();
+  }
+}
+
+// Apple Shortcut bridge: reads URL params and logs automatically.
+// Idempotent: the Shortcut should use replace=1 when pushing Apple Watch totals,
+// so re-running it updates the single "Apple Watch activity" entry instead of stacking.
+async function handleUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  const calories = parseFloat(params.get('addExercise'));
+  const name = params.get('name') || 'Apple Watch activity';
+  const duration = parseFloat(params.get('duration')) || 0;
+  const replace = params.get('replace') === '1';
+  const weight = parseFloat(params.get('logWeight'));
+
+  let didSomething = false;
+
+  // Weight push
+  if (!isNaN(weight) && weight >= 50 && weight <= 600) {
+    const today = todayKey();
+    state.weights = [...state.weights.filter(x => x.date !== today), { date: today, weight }].sort((a, b) => a.date.localeCompare(b.date));
+    try { await cloudSaveWeight(state.user.id, today, weight); didSomething = true; }
+    catch (e) { console.error('URL weight save failed', e); }
+  }
+
+  // Exercise push
+  if (!isNaN(calories) && calories > 0) {
+    try {
+      if (replace) {
+        const matching = state.exercise.filter(e => (e.name || '').toLowerCase() === name.toLowerCase());
+        for (const ex of matching) {
+          try { await cloudDeleteExercise(state.user.id, ex.id); } catch {}
+        }
+        state.exercise = state.exercise.filter(e => (e.name || '').toLowerCase() !== name.toLowerCase());
+      }
+      const entry = { time: new Date().toISOString(), name, calories: Math.round(calories), duration: Math.round(duration) };
+      const id = await cloudAddExercise(state.user.id, state.viewDate, entry);
+      state.exercise = [...state.exercise, { ...entry, id }];
+      didSomething = true;
+      refreshWeeklyCache();
+    } catch (e) {
+      console.error('URL exercise add failed', e);
+    }
+  }
+
+  if (didSomething) {
+    // Clear query string so reloads don't re-trigger
+    const url = new URL(window.location);
+    url.search = '';
+    window.history.replaceState({}, '', url.toString());
+  }
+}
+
+async function signOut() {
+  if (!confirm('Sign out? Your data stays in the cloud — you can sign back in anytime.')) return;
+  try { await sb.auth.signOut(); } catch (e) { console.error(e); }
+  state.user = null;
+  state.log = []; state.exercise = []; state.water = 0;
+  state.weights = []; state.recents = []; state.exerciseRecents = [];
+  state.plateauNotes = []; state.commitments = {}; state.photos = [];
+  state.savedMeals = []; state.customCondiments = []; state.weeklyCache = [];
+  state.modal = null;
+  render();
+}
+
+function hasLegacyLocalData() {
+  // Is there any legacy localStorage data from before the cloud migration?
+  if (localStorage.getItem('weights')) return true;
+  if (localStorage.getItem('recents')) return true;
+  if (localStorage.getItem('savedMeals')) return true;
+  if (localStorage.getItem('settings')) return true;
+  // Any log:YYYY-MM-DD key?
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && (k.startsWith('log:') || k.startsWith('water:') || k.startsWith('exercise:'))) return true;
+  }
+  return false;
+}
+
+async function migrateLocalToCloud() {
+  if (!state.user) return;
+  if (!confirm('Import data from this device to the cloud? Your local data will be uploaded to your account. This is a one-time operation.')) return;
+  state.loadingCloud = true;
+  render();
+  try {
+    const uid = state.user.id;
+
+    // Settings
+    const localSettings = load('settings', null);
+    if (localSettings) await cloudSaveSettings(uid, { ...DEFAULT_SETTINGS, ...localSettings });
+
+    // Weights
+    const localWeights = load('weights', []);
+    for (const w of localWeights) {
+      await cloudSaveWeight(uid, w.date, w.weight);
+    }
+
+    // Other top-level stuff
+    for (const key of ['recents', 'exerciseRecents', 'plateauNotes', 'commitments', 'photos', 'savedMeals', 'customCondiments']) {
+      const v = load(key, null);
+      if (v) await cloudSaveData(uid, key, v);
+    }
+
+    // Per-day log/water/exercise
+    const dayKeys = new Set();
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && /^(log|water|exercise):\d{4}-\d{2}-\d{2}$/.test(k)) {
+        dayKeys.add(k.split(':')[1]);
+      }
+    }
+    for (const date of dayKeys) {
+      const logArr = load(`log:${date}`, []);
+      for (const entry of logArr) {
+        const { id, ...rest } = entry;
+        await cloudAddFood(uid, date, rest);
+      }
+      const exArr = load(`exercise:${date}`, []);
+      for (const entry of exArr) {
+        const { id, ...rest } = entry;
+        await cloudAddExercise(uid, date, rest);
+      }
+      const water = load(`water:${date}`, null);
+      if (water) await cloudSaveWater(uid, date, water);
+    }
+
+    // Mark migration complete by clearing the legacy keys (except apiKey)
+    const keepers = ['apiKey', 'dismissedReminderDate'];
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && !keepers.includes(k) && !k.startsWith('sb-')) toRemove.push(k);
+    }
+    for (const k of toRemove) localStorage.removeItem(k);
+
+    // Reload fresh
+    const data = await cloudLoadAll(uid);
+    if (data.settings) state.settings = { ...DEFAULT_SETTINGS, ...data.settings };
+    state.weights = data.weights || [];
+    state.recents = data.recents || [];
+    state.exerciseRecents = data.exerciseRecents || [];
+    state.plateauNotes = data.plateauNotes || [];
+    state.commitments = data.commitments || {};
+    state.photos = data.photos || [];
+    state.savedMeals = data.savedMeals || [];
+    state.customCondiments = data.customCondiments || [];
+    state.migrationPrompt = false;
+    await loadDay(todayKey());
+    refreshWeeklyCache();
+    alert('Migration complete! Your data is now in the cloud.');
+  } catch (e) {
+    alert('Migration failed: ' + e.message);
+  } finally {
+    state.loadingCloud = false;
+    render();
+  }
+}
+async function prevDay() {
+  const d = new Date(state.viewDate + 'T12:00:00');
+  d.setDate(d.getDate() - 1);
+  await loadDay(d.toISOString().slice(0, 10));
+}
+async function nextDay() {
+  if (state.viewDate >= todayKey()) return;
+  const d = new Date(state.viewDate + 'T12:00:00');
+  d.setDate(d.getDate() + 1);
+  await loadDay(d.toISOString().slice(0, 10));
+}
+async function goToday() { await loadDay(todayKey()); }
+function dismissReminder() { state.dismissedReminderDate = todayKey(); save('dismissedReminderDate', state.dismissedReminderDate); render(); }
+
+function openModal(m) {
+  state.modal = m;
+  state.error = '';
+  if (m === 'settings') { state.settingsDraft = { ...state.settings }; state.settingsKeyDraft = state.apiKey; state.showKey = false; }
+  if (m === 'exercise') state.exerciseDraft = { name: '', calories: '', duration: '' };
+  if (m === 'plateauNote') {
+    // Prefill if there's a note today
+    const existing = state.plateauNotes.find(n => n.date === todayKey());
+    state.plateauDraft = existing ? { triggers: [...existing.triggers], notes: existing.notes } : { triggers: [], notes: '' };
+  }
+  if (m === 'photoCompare') state.photoCompareSelection = [];
+  render();
+}
+function closeModal() {
+  state.modal = null;
+  state.searchInput = ''; state.quickInput = '';
+  state.searchResults = []; state.servings = '1';
+  state.manual = { name: '', calories: '', protein: '', carbs: '', fat: '', category: '', notes: '' };
+  state.newWeight = '';
+  state.settingsDraft = null;
+  state.editingId = null; state.editDraft = null;
+  state.exerciseDraft = { name: '', calories: '', duration: '' };
+  state.plateauDraft = { triggers: [], notes: '' };
+  state.photoCompareSelection = [];
+  state.viewingPhotoId = null;
+  state.condimentSearch = '';
+  state.condimentSearchResults = [];
+  state.showCustomCondiment = false;
+  state.condimentDraft = { name: '', calories: '', protein: '', carbs: '', fat: '' };
+  state.preLogDraft = null;
+  state.error = '';
+  render();
+}
+
+function setMode(m) { state.addMode = m; state.error = ''; render(); }
+function updateSettingsDraft(key, value) { state.settingsDraft[key] = parseFloat(value) || 0; }
+async function saveSettings() {
+  state.settings = { ...state.settingsDraft };
+  state.apiKey = state.settingsKeyDraft.trim();
+  save('apiKey', state.apiKey); // API key stays local per device
+  closeModal();
+  try { await cloudSaveSettings(state.user.id, state.settings); }
+  catch (e) { alert('Settings save failed: ' + e.message); }
+}
+
+async function addFoodEntry(food) {
+  const time = new Date().toISOString();
+  const entry = {
+    time,
+    name: food.name,
+    calories: Math.round(food.calories || 0),
+    protein: Math.round(food.protein || 0),
+    carbs: Math.round(food.carbs || 0),
+    fat: Math.round(food.fat || 0),
+    category: food.category || inferCategory(time),
+    notes: food.notes || '',
+  };
+  // Optimistic local update with temporary id
+  const tempId = 'temp_' + Date.now() + '_' + Math.random();
+  const tempEntry = { ...entry, id: tempId };
+  state.log = [...state.log, tempEntry];
+  closeModal();
+  try {
+    const id = await cloudAddFood(state.user.id, state.viewDate, entry);
+    // Replace temp entry with real server id
+    state.log = state.log.map(f => f.id === tempId ? { ...f, id } : f);
+    // Update recents in cloud
+    const clean = { name: entry.name, calories: entry.calories, protein: entry.protein, carbs: entry.carbs, fat: entry.fat };
+    const filtered = state.recents.filter(r => r.name.toLowerCase() !== clean.name.toLowerCase());
+    state.recents = [clean, ...filtered].slice(0, 20);
+    await cloudSaveData(state.user.id, 'recents', state.recents);
+    render();
+    refreshWeeklyCache();
+  } catch (e) {
+    // Roll back on failure
+    state.log = state.log.filter(f => f.id !== tempId);
+    alert('Could not save: ' + e.message);
+    render();
+  }
+}
+
+function openEdit(id) {
+  const entry = state.log.find(f => f.id === id);
+  if (!entry) return;
+  state.editingId = id;
+  state.editDraft = {
+    name: entry.name, calories: entry.calories,
+    protein: entry.protein, carbs: entry.carbs, fat: entry.fat,
+    category: entry.category || inferCategory(entry.time),
+    notes: entry.notes || '',
+  };
+  state.modal = 'edit';
+  render();
+}
+async function saveEdit() {
+  const d = state.editDraft;
+  if (!d.name.trim()) { state.error = 'Name required'; render(); return; }
+  const updatedEntry = {
+    name: d.name.trim(),
+    calories: parseFloat(d.calories) || 0,
+    protein: parseFloat(d.protein) || 0,
+    carbs: parseFloat(d.carbs) || 0,
+    fat: parseFloat(d.fat) || 0,
+    category: d.category,
+    notes: d.notes || '',
+  };
+  state.log = state.log.map(f => f.id === state.editingId ? { ...f, ...updatedEntry } : f);
+  const existing = state.log.find(f => f.id === state.editingId);
+  closeModal();
+  try {
+    await cloudUpdateFood(state.user.id, state.editingId, { ...existing, ...updatedEntry, time: existing?.time });
+  } catch (e) { alert('Save failed: ' + e.message); }
+}
+async function deleteFromEdit() {
+  const id = state.editingId;
+  state.log = state.log.filter(f => f.id !== id);
+  closeModal();
+  try { await cloudDeleteFood(state.user.id, id); }
+  catch (e) { alert('Delete failed: ' + e.message); }
+}
+
+function addFromRecent(i) { if (!state.analyzing) addFoodEntry(state.recents[i]); }
+function openPreLog(source, idx) {
+  let food;
+  if (source === 'mine') {
+    // Build pool same way renderAddMode does to match indices
+    const q = state.searchInput.trim().toLowerCase();
+    const savedMealItems = state.savedMeals.flatMap(m => m.items || []);
+    const pool = [...state.recents, ...savedMealItems];
+    const seen = new Set();
+    const unique = pool.filter(p => {
+      const k = (p.name || '').toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    food = unique[idx];
+  } else if (source === 'ai') {
+    food = state.searchResults[idx];
+  }
+  if (!food) return;
+  state.preLogDraft = {
+    name: food.name,
+    calories: food.calories || 0,
+    protein: food.protein || 0,
+    carbs: food.carbs || 0,
+    fat: food.fat || 0,
+    category: food.category || inferCategory(new Date().toISOString()),
+  };
+  state.modal = 'preLog';
+  render();
+}
+
+function confirmPreLog() {
+  const d = state.preLogDraft;
+  if (!d || !d.name.trim()) return;
+  addFoodEntry({
+    name: d.name.trim(),
+    calories: d.calories,
+    protein: d.protein,
+    carbs: d.carbs,
+    fat: d.fat,
+    category: d.category,
+  });
+  // addFoodEntry calls closeModal which resets state.preLogDraft
+}
+
+async function handleQuick() {
+  if (!state.quickInput.trim()) return;
+  state.analyzing = true; state.error = ''; render();
+  try { addFoodEntry(await estimateByName(state.quickInput)); }
+  catch (e) { state.error = e.message; state.analyzing = false; render(); }
+  finally { state.analyzing = false; }
+}
+async function handleSearch() {
+  if (!state.searchInput.trim()) return;
+  state.analyzing = true; state.error = ''; state.searchResults = []; render();
+  try { state.searchResults = await searchOptionsAPI(state.searchInput); }
+  catch (e) { state.error = e.message; }
+  finally { state.analyzing = false; render(); }
+}
+async function handlePhoto(file) {
+  if (!file) return;
+  state.analyzing = true; state.error = ''; render();
+  try {
+    // Compress the image first so it fits within API limits (~5MB base64)
+    const compressedDataUrl = await compressImage(file, 1200, 0.8);
+    const base64 = compressedDataUrl.split(',')[1];
+    addFoodEntry(await readLabel(base64, 'image/jpeg', parseFloat(state.servings) || 1));
+  } catch (e) { state.error = e.message; state.analyzing = false; render(); }
+  finally { state.analyzing = false; }
+}
+function handleManualAdd() {
+  if (!state.manual.name.trim() || !state.manual.calories) { state.error = 'Name and calories required'; render(); return; }
+  addFoodEntry({
+    name: state.manual.name.trim(),
+    calories: parseFloat(state.manual.calories) || 0,
+    protein: parseFloat(state.manual.protein) || 0,
+    carbs: parseFloat(state.manual.carbs) || 0,
+    fat: parseFloat(state.manual.fat) || 0,
+    category: state.manual.category || inferCategory(new Date().toISOString()),
+    notes: state.manual.notes,
+  });
+}
+
+async function addWater(amount) {
+  state.water = Math.max(0, state.water + amount);
+  render();
+  try { await cloudSaveWater(state.user.id, state.viewDate, state.water); }
+  catch (e) { console.error('Water save failed', e); }
+}
+
+async function addExerciseEntry(ex) {
+  const entry = { time: new Date().toISOString(), name: ex.name, calories: Math.round(ex.calories || 0), duration: Math.round(ex.duration || 0) };
+  const tempId = 'temp_' + Date.now();
+  state.exercise = [...state.exercise, { ...entry, id: tempId }];
+  // Update exercise recents
+  const clean = { name: entry.name, calories: entry.calories, duration: entry.duration };
+  const filtered = state.exerciseRecents.filter(r => r.name.toLowerCase() !== clean.name.toLowerCase());
+  state.exerciseRecents = [clean, ...filtered].slice(0, 15);
+  closeModal();
+  try {
+    const id = await cloudAddExercise(state.user.id, state.viewDate, entry);
+    state.exercise = state.exercise.map(e => e.id === tempId ? { ...e, id } : e);
+    await cloudSaveData(state.user.id, 'exerciseRecents', state.exerciseRecents);
+    render();
+  } catch (e) {
+    state.exercise = state.exercise.filter(ex => ex.id !== tempId);
+    alert('Save failed: ' + e.message);
+    render();
+  }
+}
+async function deleteExercise(id) {
+  state.exercise = state.exercise.filter(e => e.id !== id);
+  render();
+  try { await cloudDeleteExercise(state.user.id, id); }
+  catch (e) { console.error(e); }
+}
+function handleExerciseManual() {
+  const d = state.exerciseDraft;
+  if (!d.name.trim() || !d.calories) { state.error = 'Activity name and calories required'; render(); return; }
+  addExerciseEntry({ name: d.name.trim(), calories: parseFloat(d.calories) || 0, duration: parseFloat(d.duration) || 0 });
+}
+async function handleExerciseEstimate() {
+  if (!state.exerciseDraft.name.trim()) return;
+  state.analyzing = true; state.error = ''; render();
+  try { addExerciseEntry(await estimateExercise(state.exerciseDraft.name)); }
+  catch (e) { state.error = e.message; state.analyzing = false; render(); }
+  finally { state.analyzing = false; }
+}
+function addExerciseFromRecent(i) { if (!state.analyzing) addExerciseEntry(state.exerciseRecents[i]); }
+
+function updateWeightButton() {
+  const btn = document.getElementById('weight-save-btn');
+  const err = document.getElementById('weight-error');
+  if (btn) {
+    if (state.newWeight && state.newWeight.trim()) btn.removeAttribute('disabled');
+    else btn.setAttribute('disabled', '');
+  }
+  if (err) err.style.display = 'none';
+}
+
+async function saveWeight() {
+  const w = parseFloat(state.newWeight);
+  const errEl = document.getElementById('weight-error');
+  if (isNaN(w)) { if (errEl) { errEl.textContent = 'Enter a number.'; errEl.style.display = 'block'; } return; }
+  if (w < 50 || w > 600) { if (errEl) { errEl.textContent = `${w} lbs is out of range (50-600).`; errEl.style.display = 'block'; } return; }
+  const today = todayKey();
+  state.weights = [...state.weights.filter(x => x.date !== today), { date: today, weight: w }].sort((a, b) => a.date.localeCompare(b.date));
+  closeModal();
+  try { await cloudSaveWeight(state.user.id, today, w); }
+  catch (e) { alert('Save failed: ' + e.message); }
+}
+
+// Plateau notes
+function toggleTrigger(t) {
+  const i = state.plateauDraft.triggers.indexOf(t);
+  if (i === -1) state.plateauDraft.triggers.push(t);
+  else state.plateauDraft.triggers.splice(i, 1);
+  render();
+}
+async function savePlateauNote() {
+  const today = todayKey();
+  const cw = state.weights.length ? state.weights[state.weights.length - 1].weight : state.settings.startWeight;
+  const existing = state.plateauNotes.findIndex(n => n.date === today);
+  const note = { id: Date.now(), date: today, weight: cw, triggers: [...state.plateauDraft.triggers], notes: state.plateauDraft.notes };
+  if (existing !== -1) state.plateauNotes[existing] = note;
+  else state.plateauNotes = [...state.plateauNotes, note];
+  closeModal();
+  try { await cloudSaveData(state.user.id, 'plateauNotes', state.plateauNotes); }
+  catch (e) { alert('Save failed: ' + e.message); }
+}
+async function deletePlateauNote(id) {
+  state.plateauNotes = state.plateauNotes.filter(n => n.id !== id);
+  render();
+  try { await cloudSaveData(state.user.id, 'plateauNotes', state.plateauNotes); }
+  catch (e) { console.error(e); }
+}
+
+// Commit
+async function toggleCommit() {
+  const today = todayKey();
+  state.commitments = { ...state.commitments };
+  if (state.commitments[today]) delete state.commitments[today];
+  else state.commitments[today] = true;
+  render();
+  try { await cloudSaveData(state.user.id, 'commitments', state.commitments); }
+  catch (e) { console.error(e); }
+}
+
+// Photos
+async function handlePhotoUpload(file) {
+  if (!file) return;
+  try {
+    const dataUrl = await compressImage(file);
+    const photo = { id: Date.now(), date: todayKey(), dataUrl };
+    state.photos = [...state.photos, photo];
+    render();
+    try { await cloudSaveData(state.user.id, 'photos', state.photos); }
+    catch (e) {
+      state.photos = state.photos.filter(p => p.id !== photo.id);
+      alert('Photo upload failed (maybe too large): ' + e.message);
+      render();
+    }
+  } catch (e) {
+    alert('Could not process image: ' + e.message);
+  }
+}
+function viewPhoto(id) { state.viewingPhotoId = id; state.modal = 'photoView'; render(); }
+async function deletePhoto(id) {
+  state.photos = state.photos.filter(p => p.id !== id);
+  closeModal();
+  try { await cloudSaveData(state.user.id, 'photos', state.photos); }
+  catch (e) { console.error(e); }
+}
+function togglePhotoSelect(id) {
+  const i = state.photoCompareSelection.indexOf(id);
+  if (i !== -1) state.photoCompareSelection.splice(i, 1);
+  else if (state.photoCompareSelection.length < 2) state.photoCompareSelection.push(id);
+  render();
+}
+
+// Saved meals
+function openMealBuilder() {
+  state.mealBuilder = { name: '', category: '', items: [] };
+  state.editingMealId = null;
+  state.modal = 'mealBuilder';
+  render();
+}
+function editSavedMeal(id) {
+  const m = state.savedMeals.find(x => x.id === id);
+  if (!m) return;
+  state.mealBuilder = { name: m.name, category: m.category || '', items: [...m.items] };
+  state.editingMealId = id;
+  state.modal = 'mealBuilder';
+  render();
+}
+function addToMealBuilder(recentIdx) {
+  const r = state.recents[recentIdx];
+  if (!r) return;
+  state.mealBuilder.items = [...state.mealBuilder.items, { ...r }];
+  render();
+}
+function removeMealItem(i) {
+  state.mealBuilder.items = state.mealBuilder.items.filter((_, idx) => idx !== i);
+  render();
+}
+async function saveMealBuilder() {
+  const m = state.mealBuilder;
+  if (!m.name.trim() || m.items.length === 0) return;
+  if (state.editingMealId) {
+    state.savedMeals = state.savedMeals.map(x => x.id === state.editingMealId ? { ...x, name: m.name.trim(), category: m.category, items: m.items } : x);
+  } else {
+    state.savedMeals = [...state.savedMeals, { id: Date.now(), name: m.name.trim(), category: m.category, items: m.items }];
+  }
+  state.modal = 'add';
+  state.addMode = 'meals';
+  state.mealBuilder = { name: '', category: '', items: [] };
+  state.editingMealId = null;
+  render();
+  try { await cloudSaveData(state.user.id, 'savedMeals', state.savedMeals); }
+  catch (e) { alert('Save failed: ' + e.message); }
+}
+async function deleteSavedMeal() {
+  if (!state.editingMealId) return;
+  state.savedMeals = state.savedMeals.filter(x => x.id !== state.editingMealId);
+  state.modal = 'add';
+  state.addMode = 'meals';
+  state.mealBuilder = { name: '', category: '', items: [] };
+  state.editingMealId = null;
+  render();
+  try { await cloudSaveData(state.user.id, 'savedMeals', state.savedMeals); }
+  catch (e) { console.error(e); }
+}
+async function logSavedMeal(id) {
+  const m = state.savedMeals.find(x => x.id === id);
+  if (!m) return;
+  const cat = m.category || inferCategory(new Date().toISOString());
+  closeModal();
+  // Add each item sequentially to avoid race conditions with server ids
+  for (const it of m.items) {
+    const entry = {
+      time: new Date().toISOString(),
+      name: it.name,
+      calories: Math.round(it.calories || 0),
+      protein: Math.round(it.protein || 0),
+      carbs: Math.round(it.carbs || 0),
+      fat: Math.round(it.fat || 0),
+      category: cat,
+      notes: '',
+    };
+    const tempId = 'temp_' + Date.now() + '_' + Math.random();
+    state.log = [...state.log, { ...entry, id: tempId }];
+    render();
+    try {
+      const realId = await cloudAddFood(state.user.id, state.viewDate, entry);
+      state.log = state.log.map(f => f.id === tempId ? { ...f, id: realId } : f);
+    } catch (e) {
+      state.log = state.log.filter(f => f.id !== tempId);
+      alert('Failed adding "' + entry.name + '": ' + e.message);
+      render();
+      return;
+    }
+  }
+  render();
+}
+
+// Condiments
+function logCondiment(idx) {
+  const all = [...state.customCondiments, ...DEFAULT_CONDIMENTS];
+  const c = all[idx];
+  if (!c) return;
+  addFoodEntry({
+    name: c.name,
+    calories: c.calories,
+    protein: c.protein,
+    carbs: c.carbs,
+    fat: c.fat,
+    category: 'snack',
+  });
+}
+async function handleCondimentSearch() {
+  if (!state.condimentSearch.trim()) return;
+  state.analyzing = true; state.error = ''; state.condimentSearchResults = []; render();
+  try { state.condimentSearchResults = await searchCondiment(state.condimentSearch); }
+  catch (e) { state.error = e.message; }
+  finally { state.analyzing = false; render(); }
+}
+function logCondimentResult(i) {
+  const r = state.condimentSearchResults[i];
+  if (!r) return;
+  addFoodEntry({
+    name: r.name,
+    calories: r.calories,
+    protein: r.protein,
+    carbs: r.carbs,
+    fat: r.fat,
+    category: 'snack',
+  });
+}
+async function pinCondimentResult(i) {
+  const r = state.condimentSearchResults[i];
+  if (!r) return;
+  if (state.customCondiments.some(c => c.name.toLowerCase() === r.name.toLowerCase())) {
+    state.error = 'Already pinned.';
+    render();
+    return;
+  }
+  state.customCondiments = [{ name: r.name, calories: r.calories, protein: r.protein, carbs: r.carbs, fat: r.fat }, ...state.customCondiments];
+  render();
+  try { await cloudSaveData(state.user.id, 'customCondiments', state.customCondiments); }
+  catch (e) { console.error(e); }
+}
+async function saveCustomCondiment() {
+  const d = state.condimentDraft;
+  if (!d.name.trim() || !d.calories) return;
+  state.customCondiments = [{
+    name: d.name.trim(),
+    calories: parseFloat(d.calories) || 0,
+    protein: parseFloat(d.protein) || 0,
+    carbs: parseFloat(d.carbs) || 0,
+    fat: parseFloat(d.fat) || 0,
+  }, ...state.customCondiments];
+  state.condimentDraft = { name: '', calories: '', protein: '', carbs: '', fat: '' };
+  state.showCustomCondiment = false;
+  render();
+  try { await cloudSaveData(state.user.id, 'customCondiments', state.customCondiments); }
+  catch (e) { alert('Save failed: ' + e.message); }
+}
+async function deleteCustomCondiment(i) {
+  state.customCondiments = state.customCondiments.filter((_, idx) => idx !== i);
+  render();
+  try { await cloudSaveData(state.user.id, 'customCondiments', state.customCondiments); }
+  catch (e) { console.error(e); }
+}
+
+// =====================
+// INIT
+// =====================
+async function init() {
+  render(); // shows boot screen
+  try {
+    const { data } = await sb.auth.getSession();
+    if (data?.session?.user) {
+      state.authReady = true;
+      await onSignedIn(data.session.user);
+    } else {
+      state.authReady = true;
+      render();
+    }
+  } catch (e) {
+    console.error('init failed', e);
+    state.authReady = true;
+    render();
+  }
+
+  // React to auth state changes (sign in on another tab, sign out, token refresh)
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session?.user && !state.user) {
+      await onSignedIn(session.user);
+    } else if (event === 'SIGNED_OUT') {
+      state.user = null;
+      render();
+    }
+  });
+}
+
+init();
+</script>
+</body>
+</html>
