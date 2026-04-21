@@ -1431,7 +1431,7 @@ function renderExerciseTab(c) {
       <div class="flex1">
         <div class="tiny">Daily goal</div>
         <div class="display" style="font-size:20px">${s.exerciseGoal} cal</div>
-        <div class="small text-3 mt-1">${s.exerciseGoal - c.burned > 0 ? `${s.exerciseGoal - c.burned} to go` : 'Goal hit 🔥'}</div>
+        <div class="small text-3 mt-1">${s.exerciseGoal - c.burned > 0 ? `${s.exerciseGoal - c.burned} to go` : `Goal hit ${icon('flame', 12, 'var(--lime)')}`}</div>
         <div style="height:6px;background:var(--surface-3);border-radius:3px;margin-top:10px;overflow:hidden">
           <div style="height:100%;background:var(--orange);width:${goalPct}%;transition:width 0.4s"></div>
         </div>
