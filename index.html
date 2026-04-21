@@ -358,6 +358,27 @@ document.addEventListener('touchend', async () => {
 });
 
 // =====================
+// SWIPE BETWEEN TABS
+// =====================
+let _swipeStartX = 0, _swipeStartY = 0;
+document.addEventListener('touchstart', e => {
+  _swipeStartX = e.touches[0].clientX;
+  _swipeStartY = e.touches[0].clientY;
+}, { passive: true });
+document.addEventListener('touchend', e => {
+  if (state.modal) return;
+  const dx = e.changedTouches[0].clientX - _swipeStartX;
+  const dy = e.changedTouches[0].clientY - _swipeStartY;
+  if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+  const allTabs = ['home','log','exercise','weight','meals','kitchen','settings'];
+  const visibleTabs = (state.settings.visibleTabs || allTabs).filter(id => allTabs.includes(id));
+  const idx = visibleTabs.indexOf(state.activeTab);
+  if (idx === -1) return;
+  if (dx < 0 && idx < visibleTabs.length - 1) switchTab(visibleTabs[idx + 1]);
+  else if (dx > 0 && idx > 0) switchTab(visibleTabs[idx - 1]);
+}, { passive: true });
+
+// =====================
 // BARCODE SCANNER OVERLAY (lives outside #app like toast)
 // =====================
 const _scannerEl = document.createElement('div');
@@ -603,6 +624,7 @@ const state = {
   dismissedReminderDate: load('dismissedReminderDate', null),
 
   toasts: [],
+  isOnline: navigator.onLine,
 
   // Weekly Review
   weeklyReview: null,
@@ -659,7 +681,25 @@ function icon(name, size = 16, color = 'currentColor', stroke = 2, cls = '') {
 // =====================
 // COMPUTED
 // =====================
+let _computedCache = null;
+let _computedHash = '';
+function _stateHash() {
+  // Only hash the fields computed() actually reads
+  return JSON.stringify([
+    state.log, state.exercise, state.water, state.viewDate,
+    state.weights, state.settings, state.weeklyCache,
+  ]);
+}
+
 function computed() {
+  const h = _stateHash();
+  if (h === _computedHash && _computedCache) return _computedCache;
+  _computedHash = h;
+  _computedCache = _computeInternal();
+  return _computedCache;
+}
+
+function _computeInternal() {
   const t = state.log.reduce((a, f) => ({
     calories: a.calories + (f.calories || 0),
     protein: a.protein + (f.protein || 0),
@@ -849,7 +889,13 @@ function renderApp() {
     </nav>
 
     <div class="body">
-      ${state.migrationPrompt ? `
+      \${!state.isOnline ? `
+        <div class="banner banner-warn mb-3" style="position:sticky;top:0;z-index:50;border-radius:0;margin:0 -16px;padding:10px 16px">
+          \${icon('zap', 13, '#fb923c')}
+          <div style="flex:1">Offline — changes will sync when reconnected</div>
+        </div>
+      ` : ''}
+      \${state.migrationPrompt ? `
         <div class="banner banner-success mb-4">
           ${icon('sparkles', 14, '#c4ff3f')}
           <div style="flex:1">Local data found. Import to cloud?</div>
@@ -2075,16 +2121,57 @@ function renderSettingsTab(c) {
     </div>
 
     <!-- Apple Watch Widget -->
-    <div class="card mb-4">
-      <div class="card-title mb-2">Apple Watch Widget</div>
-      <div class="small text-3 mb-3" style="line-height:1.6">Get today's calorie summary on your Watch using the iOS Shortcuts app.</div>
-      <div class="small text-3" style="line-height:1.8">
-        1. Open <strong style="color:var(--text-2)">Shortcuts</strong> on iPhone<br>
-        2. New Shortcut → <strong style="color:var(--text-2)">Get Contents of URL</strong><br>
-        3. Paste your endpoint URL (tap button below)<br>
-        4. Add <strong style="color:var(--text-2)">Show Result</strong> → add to Watch face
+    <div class="card mb-4" style="overflow:hidden">
+      <div class="row between mb-3">
+        <div class="card-title">Apple Watch Widget</div>
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--lime);box-shadow:0 0 6px var(--lime)"></div>
       </div>
-      <button class="btn btn-secondary mt-3" style="width:100%" onclick="copyWatchEndpoint()">
+      <!-- Watch face preview mockup -->
+      <div style="display:flex;justify-content:center;margin-bottom:16px">
+        <div style="position:relative;width:120px;height:144px">
+          <!-- Watch body -->
+          <svg width="120" height="144" viewBox="0 0 120 144" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Band top/bottom -->
+            <rect x="38" y="0" width="44" height="22" rx="6" fill="#1a1a1a"/>
+            <rect x="38" y="122" width="44" height="22" rx="6" fill="#1a1a1a"/>
+            <!-- Watch case -->
+            <rect x="8" y="18" width="104" height="108" rx="28" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5"/>
+            <!-- Screen -->
+            <rect x="12" y="22" width="96" height="100" rx="24" fill="#0a0a0a"/>
+            <!-- Lime accent ring -->
+            <rect x="12" y="22" width="96" height="100" rx="24" fill="none" stroke="var(--lime)" stroke-width="1" stroke-opacity="0.4"/>
+            <!-- Crown button -->
+            <rect x="111" y="52" width="4" height="20" rx="2" fill="#2a2a2a"/>
+          </svg>
+          <!-- Screen content overlay -->
+          <div style="position:absolute;top:26px;left:16px;right:16px;display:flex;flex-direction:column;align-items:center;gap:3px">
+            <!-- Bee icon small -->
+            <img src="${BEE_FULL}" style="width:18px;height:18px;object-fit:contain;margin-bottom:1px" alt="bee"/>
+            <div style="font-size:7px;color:var(--lime);font-weight:700;letter-spacing:0.08em;text-transform:uppercase">The Cut.</div>
+            <div style="font-size:16px;font-weight:700;color:#fff;line-height:1;margin-top:2px">${computed().totalCals}</div>
+            <div style="font-size:7px;color:#737373">of ${state.settings.calorieTarget || 1700} cal</div>
+            <!-- Mini macro bar -->
+            <div style="display:flex;gap:4px;margin-top:3px">
+              <div style="font-size:6px;color:#60a5fa">P${computed().totalProtein}</div>
+              <div style="font-size:6px;color:#737373">·</div>
+              <div style="font-size:6px;color:#a3e635">C${computed().totalCarbs}</div>
+              <div style="font-size:6px;color:#737373">·</div>
+              <div style="font-size:6px;color:#c084fc">F${computed().totalFat}</div>
+            </div>
+            <!-- Remaining pill -->
+            <div style="margin-top:4px;background:var(--lime);color:#000;font-size:6px;font-weight:700;padding:2px 6px;border-radius:8px">
+              ${Math.max(0, (state.settings.calorieTarget || 1700) - computed().totalCals)} left
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="small text-3 mb-3" style="line-height:1.8">
+        <span style="color:var(--lime);font-weight:600">1.</span> Open <strong style="color:var(--text-2)">Shortcuts</strong> on iPhone<br>
+        <span style="color:var(--lime);font-weight:600">2.</span> New Shortcut → <strong style="color:var(--text-2)">Get Contents of URL</strong><br>
+        <span style="color:var(--lime);font-weight:600">3.</span> Paste your endpoint URL (tap below)<br>
+        <span style="color:var(--lime);font-weight:600">4.</span> Add <strong style="color:var(--text-2)">Show Result</strong> → add to Watch face
+      </div>
+      <button class="btn btn-secondary mt-1" style="width:100%" onclick="copyWatchEndpoint()">
         ${icon('layers', 16)} Copy endpoint URL
       </button>
     </div>
@@ -2910,10 +2997,24 @@ function confirmPreLog() {
 // =====================
 // SEARCH HANDLERS
 // =====================
+const _searchCache = new Map(); // query → { results, ts }
+const _SEARCH_TTL = 10 * 60 * 1000; // 10 min
+
 async function handleSearch() {
-  if (!state.searchInput.trim()) return;
+  const q = state.searchInput.trim();
+  if (!q) return;
+  const cached = _searchCache.get(q);
+  if (cached && Date.now() - cached.ts < _SEARCH_TTL) {
+    state.searchResults = cached.results;
+    render();
+    return;
+  }
   state.analyzing = true; state.error = ''; state.searchResults = []; render();
-  try { state.searchResults = await searchOptionsAPI(state.searchInput); }
+  try {
+    const results = await searchOptionsAPI(q);
+    state.searchResults = results;
+    _searchCache.set(q, { results, ts: Date.now() });
+  }
   catch (e) { state.error = e.message; }
   finally { state.analyzing = false; render(); }
 }
@@ -4763,6 +4864,9 @@ function copyWatchEndpoint() {
 }
 
 // ── Service Worker ────────────────────────────────────────────────────────────
+window.addEventListener('online',  () => { state.isOnline = true;  render(); toast('Back online — syncing', 'success'); });
+window.addEventListener('offline', () => { state.isOnline = false; render(); });
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
