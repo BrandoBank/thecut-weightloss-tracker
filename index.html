@@ -159,6 +159,10 @@
   .toast-info { border-color: var(--border); }
   @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
+  /* Long-press delete */
+  .food-row-deleting { border-color: #ef4444 !important; background: rgba(239,68,68,0.08) !important; }
+  .food-row-delete-btn { background: #ef4444; color: #fff; border: none; border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+
   /* Stepper */
   .stepper { display: flex; align-items: center; gap: 0; background: var(--surface-2); border-radius: 10px; border: 1px solid var(--border); overflow: hidden; }
   .stepper-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 600; color: var(--lime); }
@@ -372,6 +376,7 @@ const state = {
 
   analyzing: false, error: '',
   micListening: false,
+  longPressId: null,
   dismissedReminderDate: load('dismissedReminderDate', null),
 
   toasts: [],
@@ -815,13 +820,19 @@ function macroBar(label, value, target, color, ico) {
 function renderFoodLogPreview(limit) {
   const recent = state.log.slice(-limit).reverse();
   return `<div class="space-y-2">${recent.map(f => `
-    <div class="food-row" onclick="openEditFood(${f.id})">
+    <div class="food-row ${state.longPressId === f.id ? 'food-row-deleting' : ''}"
+      onclick="if(state.longPressId===f.id){cancelLongPress()}else{openEditFood(f.id)}"
+      onmousedown="startLongPress(f.id)" ontouchstart="startLongPress(f.id)"
+      onmouseup="cancelLongPressTimer()" ontouchend="cancelLongPressTimer()"
+      onmouseleave="cancelLongPress()">
       <div class="cat-dot" style="background:${CATEGORIES[f.category]?.color || '#888'}"></div>
       <div class="flex1">
         <div class="food-row-name truncate">${esc(f.name)}</div>
         <div class="food-row-macros">P${f.protein} C${f.carbs} F${f.fat}</div>
       </div>
-      <div class="food-row-cal">${f.calories}</div>
+      ${state.longPressId === f.id
+        ? `<button class="food-row-delete-btn" onclick="event.stopPropagation(); confirmLongPressDelete(f.id)">Delete</button>`
+        : `<div class="food-row-cal">${f.calories}</div>`}
     </div>
   `).join('')}</div>`;
 }
@@ -1052,12 +1063,18 @@ function renderFullFoodLog() {
           <div class="meal-section-cals">${sub} cal</div>
         </div>
         ${items.map(f => `
-          <div class="food-row" onclick="openEditFood(${f.id})">
+          <div class="food-row ${state.longPressId === f.id ? 'food-row-deleting' : ''}"
+            onclick="if(state.longPressId===f.id){cancelLongPress()}else{openEditFood(f.id)}"
+            onmousedown="startLongPress(f.id)" ontouchstart="startLongPress(f.id)"
+            onmouseup="cancelLongPressTimer()" ontouchend="cancelLongPressTimer()"
+            onmouseleave="cancelLongPress()">
             <div class="flex1">
               <div class="food-row-name truncate">${esc(f.name)}</div>
               <div class="food-row-macros">P${f.protein} C${f.carbs} F${f.fat}${f.notes ? ' · ' + esc(f.notes.slice(0, 30)) : ''}</div>
             </div>
-            <div class="food-row-cal">${f.calories}</div>
+            ${state.longPressId === f.id
+              ? `<button class="food-row-delete-btn" onclick="event.stopPropagation(); confirmLongPressDelete(f.id)">Delete</button>`
+              : `<div class="food-row-cal">${f.calories}</div>`}
           </div>
         `).join('')}
       </div>
@@ -2416,6 +2433,38 @@ async function addFoodEntry(food) {
     toast('Could not save: ' + e.message, 'error');
     render();
   }
+}
+
+// Long-press to delete
+let _longPressTimer = null;
+
+function startLongPress(id) {
+  cancelLongPress();
+  _longPressTimer = setTimeout(() => {
+    _longPressTimer = null;
+    state.longPressId = id;
+    if (navigator.vibrate) navigator.vibrate(30);
+    render();
+  }, 500);
+}
+
+function cancelLongPressTimer() {
+  // Called on mouseup/touchend — only stops the timer, keeps Delete visible
+  if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; }
+}
+
+function cancelLongPress() {
+  // Called on mouseleave or deliberate dismiss — clears everything
+  if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; }
+  if (state.longPressId !== null) { state.longPressId = null; render(); }
+}
+
+async function confirmLongPressDelete(id) {
+  state.longPressId = null;
+  state.log = state.log.filter(f => f.id !== id);
+  render();
+  try { await cloudDeleteFood(state.user.id, id); refreshWeeklyCache(); }
+  catch (e) { toast('Delete failed: ' + e.message, 'error'); }
 }
 
 function openEditFood(id) {
