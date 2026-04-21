@@ -35,12 +35,12 @@ Format: `- [x] Tier N item N: description — commit <sha> — YYYY-MM-DD`
 
 ## Tier 4
 
-- [ ] Item 1: custom meal time windows
-- [ ] Item 2: hide tabs you don't use
-- [ ] Item 3: CSV export
-- [ ] Item 4: MyFitnessPal CSV import
-- [ ] Item 5: body measurements tracking
-- [ ] Item 6: custom accent color
+- [x] Item 1: custom meal time windows — commit 5e6af29 — 2026-04-21
+- [x] Item 2: hide tabs you don't use — commit 5e6af29 — 2026-04-21
+- [x] Item 3: CSV export — commit 5e6af29 — 2026-04-21
+- [x] Item 4: MyFitnessPal CSV import — commit 5e6af29 — 2026-04-21
+- [x] Item 5: body measurements tracking — commit 5e6af29 — 2026-04-21
+- [x] Item 6: custom accent color — commit 5e6af29 — 2026-04-21
 
 ## Tier 5
 
