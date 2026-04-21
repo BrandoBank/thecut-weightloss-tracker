@@ -379,6 +379,8 @@ const state = {
   weeklyReview: null,
   weeklyReviewLoading: false,
   dismissedWeeklyReviewDate: load('dismissedWeeklyReviewDate', null),
+  lastForgivenessDate: load('lastForgivenessDate', null),
+  dismissedForgivenessDate: load('dismissedForgivenessDate', null),
 };
 
 const root = document.getElementById('app');
@@ -753,6 +755,28 @@ function renderHomeTab(c) {
         <div style="height:100%;background:var(--teal);width:${Math.min(state.water / s.waterTarget * 100, 100)}%;transition:width 0.4s"></div>
       </div>
     </div>
+
+    <!-- Streak forgiveness banner -->
+    ${(()=>{
+      const yest = new Date(); yest.setDate(yest.getDate()-1);
+      const yesterdayKey = yest.toISOString().slice(0,10);
+      const todayStr = todayKey();
+      const byDate2 = {}; for (const d of state.weeklyCache) byDate2[d.date]=d;
+      const yesterdayEntry = byDate2[yesterdayKey];
+      const missedYesterday = !yesterdayEntry || !yesterdayEntry.logCount;
+      const hasStreak = c.streak >= 2;
+      const alreadyDismissed = state.dismissedForgivenessDate === todayStr;
+      const lastForgiveness = state.lastForgivenessDate;
+      const forgivenessEligible = !lastForgiveness || ((new Date(todayStr) - new Date(lastForgiveness)) / 86400000) >= 7;
+      const isViewingToday = state.viewDate === todayStr;
+      if (!missedYesterday || !hasStreak || alreadyDismissed || !forgivenessEligible || !isViewingToday) return '';
+      return `<div class="banner banner-success mb-3" style="border-color:var(--lime)">
+        ${icon('flame',14,'#c4ff3f')}
+        <div style="flex:1"><strong>Save your ${c.streak}-day streak</strong> — forgot yesterday?</div>
+        <button class="btn-sm btn-primary" onclick="useForgiveness('${yesterdayKey}')" style="flex-shrink:0">Log it</button>
+        <button onclick="state.dismissedForgivenessDate='${todayStr}';save('dismissedForgivenessDate','${todayStr}');render()" style="color:#737373;padding:4px;flex-shrink:0">${icon('x',14)}</button>
+      </div>`;
+    })()}
 
     <!-- Plateau banner -->
     ${c.inPlateau ? renderPlateauBanner() : ''}
@@ -1961,6 +1985,23 @@ async function nextDay() {
   await loadDay(d.toISOString().slice(0, 10));
 }
 async function goToday() { await loadDay(todayKey()); }
+
+async function useForgiveness(date) {
+  // Record that forgiveness was used today
+  const todayStr = todayKey();
+  state.lastForgivenessDate = todayStr;
+  state.dismissedForgivenessDate = todayStr;
+  save('lastForgivenessDate', todayStr);
+  save('dismissedForgivenessDate', todayStr);
+  // Navigate to yesterday's log
+  await loadDay(date);
+  state.activeTab = 'log';
+  save('activeTab', 'log');
+  render();
+  toast('Logging for yesterday — save your streak!', 'success');
+}
+
+
 
 async function loadDay(date) {
   state.viewDate = date;
