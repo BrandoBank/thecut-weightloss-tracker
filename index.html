@@ -3524,23 +3524,239 @@ async function executeDayPlanLog() {
   if (!pending) return;
   closeModal();
   let logged = 0;
-  for (const id of pending.mealIds) {
-    const m = state.savedMeals.find(x => x.id === id);
-    if (!m) continue;
-    const cat = m.category || inferCategory(new Date().toISOString());
-    for (const item of (m.items || [])) {
-      await addFoodEntry({ ...item, category: cat });
+  if (pending.directItems) {
+    // Builder/Discover plans log items directly
+    for (const item of pending.directItems) {
+      await addFoodEntry({ ...item, category: item.category || inferCategory(new Date().toISOString()) });
       logged++;
     }
-  }
-  // Increment usage count if from a plan
-  if (pending.source === 'plan' && pending.planIdx != null) {
-    state.savedDayPlans = state.savedDayPlans.map((dp, i) => i === pending.planIdx ? { ...dp, usageCount: (dp.usageCount||0) + 1 } : dp);
-    cloudSaveData(state.user.id, 'savedDayPlans', state.savedDayPlans).catch(() => {});
+  } else {
+    for (const id of (pending.mealIds || [])) {
+      const m = state.savedMeals.find(x => x.id === id);
+      if (!m) continue;
+      const cat = m.category || inferCategory(new Date().toISOString());
+      for (const item of (m.items || [])) {
+        await addFoodEntry({ ...item, category: cat });
+        logged++;
+      }
+    }
+    // Increment usage count if from a saved day plan
+    if (pending.source === 'plan' && pending.planIdx != null) {
+      state.savedDayPlans = state.savedDayPlans.map((dp, i) => i === pending.planIdx ? { ...dp, usageCount: (dp.usageCount||0) + 1 } : dp);
+      cloudSaveData(state.user.id, 'savedDayPlans', state.savedDayPlans).catch(() => {});
+    }
   }
   state.planLabPendingLog = null;
   toast(`Logged ${logged} items to today!`, 'success');
   goTab('log');
+}
+
+function renderPlanLabBuilder(c) {
+  const s = state.settings;
+  const con = state.planLabBuilderConstraints;
+  return `
+    <div class="card mb-3">
+      <div class="card-title mb-2">${icon('sparkles', 12, '#c4ff3f')} Generate a full day plan</div>
+      <div class="text-3 small mb-3">AI will create 3 complete day plans with breakfast, lunch, dinner, and snacks that hit your targets.</div>
+
+      <div class="mb-3">
+        <label class="field-label">Extra instructions (optional)</label>
+        <input class="field" type="text" value="${esc(state.planLabBuilderPrompt)}" placeholder='e.g. "Mediterranean", "no dairy", "quick meals"' oninput="state.planLabBuilderPrompt = this.value"/>
+      </div>
+
+      <div class="grid2 mb-3" style="gap:8px">
+        <div>
+          <label class="field-label">Cuisine style</label>
+          <input class="field" type="text" value="${esc(con.cuisine)}" placeholder="Any" oninput="state.planLabBuilderConstraints.cuisine = this.value"/>
+        </div>
+        <div>
+          <label class="field-label">Dietary</label>
+          <input class="field" type="text" value="${esc(con.dietary)}" placeholder="None" oninput="state.planLabBuilderConstraints.dietary = this.value"/>
+        </div>
+        <div>
+          <label class="field-label">Max prep time</label>
+          <input class="field" type="text" value="${esc(con.prepTime)}" placeholder="Any" oninput="state.planLabBuilderConstraints.prepTime = this.value"/>
+        </div>
+        <div>
+          <label class="field-label">Meals per day</label>
+          <select class="field" onchange="state.planLabBuilderConstraints.mealCount = this.value">
+            ${['3','4','5'].map(n => `<option value="${n}" ${con.mealCount === n ? 'selected' : ''}>${n} meals</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%" onclick="handlePlanLabBuilder()" ${state.analyzing ? 'disabled' : ''}>
+        ${state.analyzing ? `${icon('loader', 16, '#000', 2, 'spin')} Generating plans…` : `${icon('sparkles', 16, '#000')} Generate 3 day plans`}
+      </button>
+      ${state.error ? `<div class="error">${esc(state.error)}</div>` : ''}
+    </div>
+
+    ${renderPlanLabBuilderResults()}
+  `;
+}
+
+function renderPlanLabBuilderResults() {
+  if (!state.planLabBuilderResults.length) return '';
+  return `
+    <div class="space-y-4">
+      ${state.planLabBuilderResults.map((plan, pi) => {
+        const totals = (plan.meals || []).flatMap(m => m.items || []).reduce((a, it) => ({
+          cal: a.cal+(it.calories||0), p: a.p+(it.protein||0), c: a.c+(it.carbs||0), f: a.f+(it.fat||0)
+        }), { cal:0, p:0, c:0, f:0 });
+        return `<div class="card">
+          <div class="row between mb-2">
+            <div style="font-weight:700;font-size:15px">${esc(plan.name || 'Option ' + (pi+1))}</div>
+            <div class="small mono lime">${totals.cal} cal</div>
+          </div>
+          <div class="small text-3 mono mb-3">P${totals.p} C${totals.c} F${totals.f}</div>
+          ${(plan.meals || []).map(meal => `
+            <div style="margin-bottom:10px">
+              <div class="tiny" style="color:#737373;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">${esc(meal.slot || meal.name)}</div>
+              ${(meal.items || []).map(it => `
+                <div class="row between" style="padding:6px 0;border-bottom:1px solid var(--surface-2)">
+                  <div class="small">${esc(it.name)}</div>
+                  <div class="tiny text-3 mono">${it.calories} cal</div>
+                </div>`).join('')}
+            </div>`).join('')}
+          <div class="row" style="gap:6px;margin-top:12px">
+            <button class="btn btn-secondary btn-sm" style="flex:1" onclick="saveBuilderPlanAsTemplate(${pi})">${icon('layers', 13)} Save meals</button>
+            <button class="btn btn-primary btn-sm" style="flex:1" onclick="logBuilderPlan(${pi})">${icon('plus', 13, '#000')} Log to today</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderPlanLabDiscover(c) {
+  return `
+    <div class="card mb-3">
+      <div class="card-title mb-2">${icon('sparkles', 12, '#c4ff3f')} Discover meal plans</div>
+      <div class="banner banner-warn mb-3" style="font-size:11px">
+        ${icon('shield', 12, '#fb923c')}
+        <div>AI knowledge only — not real-time search. For specific creators, paste their content into Import mode.</div>
+      </div>
+      <div class="mb-3">
+        <input class="field" type="text" value="${esc(state.planLabDiscoverQuery)}" placeholder='e.g. "high protein bodybuilder day", "Mediterranean cut day"' oninput="state.planLabDiscoverQuery = this.value" onkeydown="if(event.key==='Enter') handlePlanLabDiscover()"/>
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="handlePlanLabDiscover()" ${state.analyzing || !state.planLabDiscoverQuery.trim() ? 'disabled' : ''}>
+        ${state.analyzing ? `${icon('loader', 16, '#000', 2, 'spin')} Discovering…` : `${icon('sparkles', 16, '#000')} Discover plans`}
+      </button>
+      ${state.error ? `<div class="error">${esc(state.error)}</div>` : ''}
+    </div>
+    ${state.planLabDiscoverResults.length ? `
+      <div class="space-y-4">
+        ${state.planLabDiscoverResults.map((plan, pi) => {
+          const totals = (plan.meals || []).flatMap(m => m.items || []).reduce((a, it) => ({
+            cal: a.cal+(it.calories||0), p: a.p+(it.protein||0), c: a.c+(it.carbs||0), f: a.f+(it.fat||0)
+          }), { cal:0, p:0, c:0, f:0 });
+          return `<div class="card">
+            <div class="row between mb-2">
+              <div style="font-weight:700;font-size:15px">${esc(plan.name || 'Plan ' + (pi+1))}</div>
+              <div class="small mono lime">${totals.cal} cal</div>
+            </div>
+            <div class="small text-3 mono mb-3">P${totals.p} C${totals.c} F${totals.f}</div>
+            ${(plan.meals || []).map(meal => `
+              <div style="margin-bottom:10px">
+                <div class="tiny" style="color:#737373;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">${esc(meal.slot || meal.name)}</div>
+                ${(meal.items || []).map(it => `
+                  <div class="row between" style="padding:6px 0;border-bottom:1px solid var(--surface-2)">
+                    <div class="small">${esc(it.name)}</div>
+                    <div class="tiny text-3 mono">${it.calories} cal</div>
+                  </div>`).join('')}
+              </div>`).join('')}
+            <div class="row" style="gap:6px;margin-top:12px">
+              <button class="btn btn-secondary btn-sm" style="flex:1" onclick="saveDiscoverPlanAsTemplate(${pi})">${icon('layers', 13)} Save meals</button>
+              <button class="btn btn-primary btn-sm" style="flex:1" onclick="logDiscoverPlan(${pi})">${icon('plus', 13, '#000')} Log to today</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>` : ''}
+  `;
+}
+
+async function handlePlanLabBuilder() {
+  if (!state.apiKey) { toast('Add your Anthropic API key in Settings.', 'error'); return; }
+  const s = state.settings;
+  const con = state.planLabBuilderConstraints;
+  state.analyzing = true; state.error = ''; state.planLabBuilderResults = []; render();
+  try {
+    const constraints = [
+      con.cuisine && `cuisine: ${con.cuisine}`,
+      con.dietary && `dietary: ${con.dietary}`,
+      con.prepTime && `max prep time per meal: ${con.prepTime}`,
+    ].filter(Boolean).join(', ');
+    const prompt = `Create 3 distinct full-day meal plans that hit these targets: ${s.calorieTarget} cal, ${s.proteinTarget}g protein, ${s.carbTarget}g carbs, ${s.fatTarget}g fat. Each plan should have ${con.mealCount} meals (breakfast/lunch/dinner + snacks). ${state.planLabBuilderPrompt ? 'Extra requirements: ' + state.planLabBuilderPrompt + '.' : ''} ${constraints ? 'Constraints: ' + constraints + '.' : ''} Be conservative with calories. ONLY JSON, no preamble. Schema: [{"name": string (plan theme), "meals": [{"slot": string (Breakfast/Lunch/Dinner/Snack), "items": [{"name": string (food with portion), "calories": int, "protein": int, "carbs": int, "fat": int}]}]}]`;
+    const t = await callClaude({ model: MODEL, max_tokens: 3000, messages: [{ role: 'user', content: prompt }] });
+    const r = extractJSON(t);
+    if (!r || !Array.isArray(r)) throw new Error('Could not parse response');
+    state.planLabBuilderResults = r;
+  } catch (e) { state.error = e.message; }
+  finally { state.analyzing = false; render(); }
+}
+
+async function handlePlanLabDiscover() {
+  if (!state.apiKey) { toast('Add your Anthropic API key in Settings.', 'error'); return; }
+  if (!state.planLabDiscoverQuery.trim()) return;
+  const s = state.settings;
+  state.analyzing = true; state.error = ''; state.planLabDiscoverResults = []; render();
+  try {
+    const prompt = `The user is searching for meal plan ideas matching: "${state.planLabDiscoverQuery}". Their daily targets are ${s.calorieTarget} cal / ${s.proteinTarget}g protein. Generate 2 full-day meal plans inspired by this style/theme. Use your knowledge of popular diets, fitness creators, and common meal prep approaches. ONLY JSON, no preamble. Schema: [{"name": string (plan name/inspiration), "meals": [{"slot": string (Breakfast/Lunch/Dinner/Snack), "items": [{"name": string (food with portion), "calories": int, "protein": int, "carbs": int, "fat": int}]}]}]`;
+    const t = await callClaude({ model: MODEL, max_tokens: 2500, messages: [{ role: 'user', content: prompt }] });
+    const r = extractJSON(t);
+    if (!r || !Array.isArray(r)) throw new Error('Could not parse response');
+    state.planLabDiscoverResults = r;
+  } catch (e) { state.error = e.message; }
+  finally { state.analyzing = false; render(); }
+}
+
+async function saveBuilderPlanAsTemplate(planIdx) {
+  const plan = state.planLabBuilderResults[planIdx];
+  if (!plan) return;
+  // Save each meal slot as a separate saved meal
+  let saved = 0;
+  for (const meal of (plan.meals || [])) {
+    const name = `${plan.name} — ${meal.slot}`;
+    const newMeal = { id: Date.now() + saved, name, category: inferCategory(new Date().toISOString()), items: meal.items || [] };
+    state.savedMeals = [...state.savedMeals, newMeal];
+    saved++;
+  }
+  try { await cloudSaveData(state.user.id, 'savedMeals', state.savedMeals); toast(`Saved ${saved} meals to your library!`, 'success'); }
+  catch (e) { toast('Save failed: ' + e.message, 'error'); }
+  render();
+}
+
+async function logBuilderPlan(planIdx) {
+  const plan = state.planLabBuilderResults[planIdx];
+  if (!plan) return;
+  const allItems = (plan.meals || []).flatMap(m => (m.items || []).map(it => ({ ...it, category: inferCategory(new Date().toISOString()) })));
+  state.planLabPendingLog = { source: 'builder', names: (plan.meals || []).map(m => m.slot || m.name), directItems: allItems };
+  state.modal = 'confirmLogDayPlan';
+  render();
+}
+
+async function saveDiscoverPlanAsTemplate(planIdx) {
+  const plan = state.planLabDiscoverResults[planIdx];
+  if (!plan) return;
+  let saved = 0;
+  for (const meal of (plan.meals || [])) {
+    const name = `${plan.name} — ${meal.slot}`;
+    const newMeal = { id: Date.now() + saved, name, category: inferCategory(new Date().toISOString()), items: meal.items || [] };
+    state.savedMeals = [...state.savedMeals, newMeal];
+    saved++;
+  }
+  try { await cloudSaveData(state.user.id, 'savedMeals', state.savedMeals); toast(`Saved ${saved} meals to your library!`, 'success'); }
+  catch (e) { toast('Save failed: ' + e.message, 'error'); }
+  render();
+}
+
+async function logDiscoverPlan(planIdx) {
+  const plan = state.planLabDiscoverResults[planIdx];
+  if (!plan) return;
+  const allItems = (plan.meals || []).flatMap(m => (m.items || []).map(it => ({ ...it, category: inferCategory(new Date().toISOString()) })));
+  state.planLabPendingLog = { source: 'discover', names: (plan.meals || []).map(m => m.slot || m.name), directItems: allItems };
+  state.modal = 'confirmLogDayPlan';
+  render();
 }
 
 // WAR ROOM AI
