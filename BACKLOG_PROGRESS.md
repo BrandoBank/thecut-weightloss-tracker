@@ -7,13 +7,13 @@ Format: `- [x] Tier N item N: description — commit <sha> — YYYY-MM-DD`
 
 ## Tier 1
 
-- [ ] Item 1: toast system — in progress
-- [ ] Item 2: weekly review modal
-- [ ] Item 3: weight trend ETA to goal
-- [ ] Item 4: streak forgiveness
-- [ ] Item 5: voice input for Quick mode
-- [ ] Item 6: long-press to delete
-- [ ] Item 7: Meal Plan Lab (full)
+- [x] Item 1: toast system — commit 3167bfa — 2026-04-21
+- [x] Item 2: weekly review modal — commit 6225a84 — 2026-04-21
+- [x] Item 3: weight trend ETA to goal — commit 71096ea — 2026-04-21
+- [x] Item 4: streak forgiveness — commit be5ce0a — 2026-04-21
+- [x] Item 5: voice input for Quick mode — commit 148474c — 2026-04-21
+- [x] Item 6: long-press to delete — commit e095105 — 2026-04-21
+- [x] Item 7: Meal Plan Lab (full) — commits 0477366, 1984666, 974f8ea — 2026-04-21
 
 ## Tier 2
 
