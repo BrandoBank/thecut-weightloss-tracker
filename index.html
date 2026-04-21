@@ -374,6 +374,11 @@ const state = {
   dismissedReminderDate: load('dismissedReminderDate', null),
 
   toasts: [],
+
+  // Weekly Review
+  weeklyReview: null,
+  weeklyReviewLoading: false,
+  dismissedWeeklyReviewDate: load('dismissedWeeklyReviewDate', null),
 };
 
 const root = document.getElementById('app');
@@ -1092,8 +1097,13 @@ function renderWeightTab(c) {
   return `
     <div class="row between mb-3">
       <div class="display" style="font-size:24px">Weight</div>
-      <button class="btn-sm btn-primary" onclick="openModal('weight')">${icon('plus', 14, '#000')} Log weight</button>
+      <div class="row" style="gap:6px">
+        <button class="btn-sm btn-ghost" onclick="openWeeklyReview()">${icon('chart', 12)} Weekly Review</button>
+        <button class="btn-sm btn-primary" onclick="openModal('weight')">${icon('plus', 14, '#000')} Log weight</button>
+      </div>
     </div>
+
+    ${(()=>{ const d=new Date(); const isSunday=d.getDay()===0; const todayKey2=d.toISOString().slice(0,10); const alreadyDismissed=state.dismissedWeeklyReviewDate===todayKey2; return isSunday&&!alreadyDismissed ? `<div class="banner banner-success mb-3" style="border-color:var(--lime)">${icon('sparkles',14,'#c4ff3f')}<div style="flex:1"><strong>Sunday debrief</strong> — review your week</div><button class="btn-sm btn-primary" onclick="openWeeklyReview()" style="flex-shrink:0">View</button><button onclick="state.dismissedWeeklyReviewDate='${todayKey2}';save('dismissedWeeklyReviewDate','${todayKey2}');render()" style="color:#737373;padding:4px;flex-shrink:0">${icon('x',14)}</button></div>` : ''; })()}
 
     <div class="card mb-3">
       <div class="row between">
@@ -1426,6 +1436,7 @@ function renderModals() {
     ${state.modal === 'exerciseManual' ? renderExerciseManualModal() : ''}
     ${state.modal === 'photoView' ? renderPhotoViewModal() : ''}
     ${state.modal === 'photoCompare' ? renderPhotoCompareModal() : ''}
+    ${state.modal === 'weeklyReview' ? renderWeeklyReviewModal() : ''}
   `;
 }
 
@@ -1945,6 +1956,188 @@ function openModal(name, data) {
   if (name === 'plateau') state.plateauDraft = { triggers: [], notes: '' };
   if (name === 'photoCompare') state.photoCompareSelection = [];
   render();
+}
+
+async function openWeeklyReview() {
+  state.modal = 'weeklyReview';
+  state.weeklyReview = null;
+  state.weeklyReviewLoading = true;
+  render();
+
+  try {
+    // Gather last 7 days of data
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 6);
+    const cutoffKey = cutoff.toISOString().slice(0, 10);
+    const todayKey = new Date().toISOString().slice(0, 10);
+
+    const [foodRes, exRes] = await Promise.all([
+      sb.from('food_log').select('date, entry').eq('user_id', state.user.id).gte('date', cutoffKey),
+      sb.from('exercise_log').select('date, entry').eq('user_id', state.user.id).gte('date', cutoffKey),
+    ]);
+
+    const byDate = {};
+    for (const r of (foodRes.data || [])) {
+      byDate[r.date] = byDate[r.date] || { date: r.date, cals: 0, burned: 0, logCount: 0, foods: [] };
+      byDate[r.date].cals += r.entry?.calories || 0;
+      byDate[r.date].logCount++;
+      if (r.entry?.name) byDate[r.date].foods.push(r.entry.name);
+    }
+    for (const r of (exRes.data || [])) {
+      byDate[r.date] = byDate[r.date] || { date: r.date, cals: 0, burned: 0, logCount: 0, foods: [] };
+      byDate[r.date].burned += r.entry?.calories || 0;
+    }
+
+    const days = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+    const loggedDays = days.filter(d => d.logCount > 0);
+    const target = state.settings.calorieTarget;
+    const avgCals = loggedDays.length ? Math.round(loggedDays.reduce((a, d) => a + d.cals, 0) / loggedDays.length) : 0;
+    const avgBurned = loggedDays.length ? Math.round(loggedDays.reduce((a, d) => a + d.burned, 0) / loggedDays.length) : 0;
+    const totalDeficit = loggedDays.reduce((a, d) => a + Math.max(0, target - (d.cals - d.burned)), 0);
+
+    // Weight change over the week
+    const weekWeights = state.weights.filter(w => w.date >= cutoffKey).sort((a, b) => a.date.localeCompare(b.date));
+    const weightChange = weekWeights.length >= 2
+      ? (weekWeights[weekWeights.length - 1].weight - weekWeights[0].weight).toFixed(1)
+      : null;
+
+    // Streak (reuse computed logic)
+    const c = computed();
+    const streak = c.streak;
+
+    // Plateau days
+    const plateauDays = days.filter(d => {
+      const w = state.weights.find(ww => ww.date === d.date);
+      return w && w.weight >= state.settings.plateauLow && w.weight <= state.settings.plateauHigh;
+    }).length;
+
+    // Top 3 most-logged foods
+    const foodCounts = {};
+    for (const d of days) {
+      for (const name of (d.foods || [])) {
+        const key = name.toLowerCase().trim();
+        foodCounts[key] = (foodCounts[key] || { name, count: 0 });
+        foodCounts[key].count++;
+      }
+    }
+    const topFoods = Object.values(foodCounts).sort((a, b) => b.count - a.count).slice(0, 3);
+
+    // AI reflection (optional — skip if no API key)
+    let reflection = null;
+    if (state.apiKey) {
+      try {
+        const prompt = `You are a concise, encouraging nutrition coach. Write exactly ONE short paragraph (2-3 sentences max) reflecting on this person's past 7 days of tracking. Be specific about their numbers, honest about what's working or not, and end with one actionable tip for next week. Do NOT use bullet points or headers — just plain prose.
+
+Stats:
+- Days logged: ${loggedDays.length}/7
+- Avg daily calories: ${avgCals} (target: ${target})
+- Avg exercise burn: ${avgBurned}/day
+- Total deficit: ~${Math.round(totalDeficit)} cal
+- Weight change: ${weightChange !== null ? weightChange + ' lbs' : 'not enough data'}
+- Streak: ${streak} days
+- Plateau days: ${plateauDays}
+- Top foods: ${topFoods.map(f => f.name).join(', ') || 'none'}`;
+        reflection = await callClaude({ model: MODEL, max_tokens: 200, messages: [{ role: 'user', content: prompt }] });
+      } catch (e) { /* non-fatal — reflection is optional */ }
+    }
+
+    state.weeklyReview = { avgCals, avgBurned, totalDeficit, weightChange, streak, plateauDays, topFoods, loggedDays: loggedDays.length, reflection };
+  } catch (e) {
+    toast('Could not load weekly data: ' + e.message, 'error');
+    state.modal = null;
+  }
+  state.weeklyReviewLoading = false;
+  render();
+}
+
+function renderWeeklyReviewModal() {
+  const r = state.weeklyReview;
+  const loading = state.weeklyReviewLoading;
+  const target = state.settings.calorieTarget;
+
+  return `<div class="overlay" onclick="if(event.target===this) closeModal()">
+    <div class="sheet" style="max-height:85vh">
+      <div class="sheet-head">
+        <div style="font-size:18px;font-weight:700">Weekly Debrief</div>
+        <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+      </div>
+      <div class="sheet-body">
+        ${loading ? `
+          <div style="text-align:center;padding:48px 0;color:#737373">
+            ${icon('loader', 20, '#737373', 2, 'spin')}
+            <div class="small mt-2">Crunching your week…</div>
+          </div>
+        ` : r ? `
+          <div class="grid2 mb-3">
+            <div class="stat-tile">
+              <div class="stat-tile-label">${icon('calendar', 11)} Days logged</div>
+              <div class="stat-tile-value ${r.loggedDays >= 5 ? 'lime' : ''}">${r.loggedDays}<span class="unit">/7</span></div>
+            </div>
+            <div class="stat-tile">
+              <div class="stat-tile-label">${icon('flame', 11)} Streak</div>
+              <div class="stat-tile-value lime">${r.streak}<span class="unit">days</span></div>
+            </div>
+          </div>
+
+          <div class="card mb-3">
+            <div class="card-title mb-2">Calories</div>
+            <div class="row between mb-1">
+              <div class="small text-3">Avg daily intake</div>
+              <div class="small mono ${r.avgCals <= target ? 'lime' : 'text-2'}">${r.avgCals} cal</div>
+            </div>
+            <div class="row between mb-1">
+              <div class="small text-3">Avg exercise burn</div>
+              <div class="small mono">${r.avgBurned} cal</div>
+            </div>
+            <div class="row between">
+              <div class="small text-3">Total deficit</div>
+              <div class="small mono lime">~${Math.round(r.totalDeficit).toLocaleString()} cal</div>
+            </div>
+          </div>
+
+          <div class="card mb-3">
+            <div class="card-title mb-2">Weight</div>
+            ${r.weightChange !== null ? `
+              <div class="row between">
+                <div class="small text-3">Change this week</div>
+                <div class="small mono ${parseFloat(r.weightChange) < 0 ? 'lime' : 'text-2'}">${parseFloat(r.weightChange) > 0 ? '+' : ''}${r.weightChange} lbs</div>
+              </div>
+              ${r.plateauDays > 0 ? `<div class="small text-3 mt-2">${icon('alert', 11, '#f59e0b')} ${r.plateauDays} day${r.plateauDays > 1 ? 's' : ''} in plateau zone</div>` : ''}
+            ` : `<div class="small text-3">Log weight on multiple days to see a trend.</div>`}
+          </div>
+
+          ${r.topFoods.length ? `
+            <div class="card mb-3">
+              <div class="card-title mb-2">Most logged this week</div>
+              <div class="space-y-2">
+                ${r.topFoods.map((f, i) => `
+                  <div class="row between">
+                    <div class="small">${['🥇','🥈','🥉'][i]} ${esc(f.name)}</div>
+                    <div class="tiny text-3">${f.count}×</div>
+                  </div>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          ${r.reflection ? `
+            <div class="card mb-3" style="border-color:var(--lime)">
+              <div class="row mb-2" style="gap:6px">
+                ${icon('sparkles', 13, '#c4ff3f')}
+                <div class="tiny" style="color:var(--lime)">AI Reflection</div>
+              </div>
+              <div class="small" style="line-height:1.6;color:var(--text-2)">${esc(r.reflection)}</div>
+            </div>
+          ` : state.apiKey ? '' : `
+            <div class="card mb-3">
+              <div class="small text-3">Add your Anthropic API key in Settings to get an AI-generated reflection.</div>
+            </div>
+          `}
+
+          <button class="btn btn-secondary" style="width:100%" onclick="closeModal()">Done</button>
+        ` : ''}
+      </div>
+    </div>
+  </div>`;
 }
 
 function closeModal() {
