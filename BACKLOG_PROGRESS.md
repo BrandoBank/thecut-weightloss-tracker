@@ -51,9 +51,9 @@ Format: `- [x] Tier N item N: description — commit <sha> — YYYY-MM-DD`
 
 ## Tier 6
 
-- [ ] Item 1: targeted re-renders for high-frequency input
-- [ ] Item 2: wrap silent cloud errors
-- [ ] Item 3: fix replace=1 URL param exact-name matching
-- [ ] Item 4: Sentry-lite error logging
-- [ ] Item 5: accessibility pass
-- [ ] Item 6: visual regression suite
+- [x] Item 1: targeted re-renders for high-frequency input — commit 164e213 — 2026-04-21
+- [x] Item 2: wrap silent cloud errors — commit 164e213 — 2026-04-21
+- [x] Item 3: fix replace=1 URL param exact-name matching — commit 164e213 — 2026-04-21
+- [x] Item 4: Sentry-lite error logging — commit 164e213 — 2026-04-21
+- [x] Item 5: accessibility pass — commit 164e213 — 2026-04-21
+- [x] Item 6: visual regression suite — commit 7795cbf — 2026-04-21
