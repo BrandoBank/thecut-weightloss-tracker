@@ -1313,12 +1313,50 @@ function renderMealsTab(c) {
     </div>
 
     <div class="segments mb-3">
-      <button class="seg ${state.logMode === 'meals-saved' || (state.logMode !== 'meals-condiments') ? 'active' : ''}" onclick="state.logMode='meals-saved'; render()">Saved Meals</button>
-      <button class="seg ${state.logMode === 'meals-condiments' ? 'active' : ''}" onclick="state.logMode='meals-condiments'; render()">Sauces & Condiments</button>
+      <button class="seg ${state.logMode === 'meals-saved' || (state.logMode !== 'meals-condiments' && state.logMode !== 'meals-dayplans') ? 'active' : ''}" onclick="state.logMode='meals-saved'; render()">Saved Meals</button>
+      <button class="seg ${state.logMode === 'meals-dayplans' ? 'active' : ''}" onclick="state.logMode='meals-dayplans'; render()">Day Plans</button>
+      <button class="seg ${state.logMode === 'meals-condiments' ? 'active' : ''}" onclick="state.logMode='meals-condiments'; render()">Sauces</button>
     </div>
 
-    ${state.logMode === 'meals-condiments' ? renderCondimentsSection() : renderSavedMealsSection()}
+    ${state.logMode === 'meals-condiments' ? renderCondimentsSection() : state.logMode === 'meals-dayplans' ? renderDayPlansSection() : renderSavedMealsSection()}
   `;
+}
+
+function renderDayPlansSection() {
+  const plans = [...state.savedDayPlans].sort((a, b) => (b.usageCount||0) - (a.usageCount||0));
+  if (plans.length === 0) {
+    return `<div class="card"><div class="empty-state">
+      <div class="text-3 small">No day plans saved yet.</div>
+      <div class="text-3 small mt-2">Build one in War Room → Plan Lab → Mix & Match.</div>
+    </div></div>`;
+  }
+  return `<div class="space-y-3">
+    ${plans.map((dp, i) => {
+      const realIdx = state.savedDayPlans.indexOf(dp);
+      const dpTotals = (dp.mealIds || []).reduce((acc, id) => {
+        const m = state.savedMeals.find(x => x.id === id);
+        if (!m) return acc;
+        const mt = (m.items || []).reduce((a, it) => ({ cal: a.cal+(it.calories||0), p: a.p+(it.protein||0), c: a.c+(it.carbs||0), f: a.f+(it.fat||0) }), { cal:0, p:0, c:0, f:0 });
+        return { cal: acc.cal+mt.cal, p: acc.p+mt.p, c: acc.c+mt.c, f: acc.f+mt.f };
+      }, { cal:0, p:0, c:0, f:0 });
+      const mealNames = (dp.mealIds || []).map(id => state.savedMeals.find(m => m.id === id)?.name).filter(Boolean);
+      return `<div class="card">
+        <div class="row between mb-2">
+          <div>
+            <div style="font-weight:700;font-size:15px">${esc(dp.name)}</div>
+            <div class="tiny text-3 mt-1">${dp.mealIds.length} meals · used ${dp.usageCount||0}×</div>
+          </div>
+          <button onclick="deleteDayPlan(${realIdx})" style="padding:6px;color:#525252">${icon('trash', 14)}</button>
+        </div>
+        <div class="small text-3 mono mb-2">${dpTotals.cal} cal · P${dpTotals.p} C${dpTotals.c} F${dpTotals.f}</div>
+        <div class="small text-3 mb-3" style="line-height:1.5">${mealNames.map(n => esc(n)).join(' · ')}</div>
+        <div class="row" style="gap:6px">
+          <button class="btn btn-secondary" style="flex:1" onclick="state.planLabSelection=[...state.savedDayPlans[${realIdx}].mealIds]; state.warMode='planlab'; state.planLabMode='mixmatch'; goTab('warroom')">Edit in Mix & Match</button>
+          <button class="btn btn-primary" style="flex:1" onclick="confirmLogDayPlan(${realIdx})">${icon('plus', 14, '#000')} Log all</button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 
 function renderSavedMealsSection() {
