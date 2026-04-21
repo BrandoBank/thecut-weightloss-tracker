@@ -17,14 +17,14 @@ Format: `- [x] Tier N item N: description — commit <sha> — YYYY-MM-DD`
 
 ## Tier 2
 
-- [ ] Item 1: search inside saved meals
-- [ ] Item 2: sort saved meals by frequency
-- [ ] Item 3: duplicate entry button
-- [ ] Item 4: macro distribution donut chart
-- [ ] Item 5: quick-add from Recents pills on HOME
-- [ ] Item 6: pull-to-refresh on day view
-- [ ] Item 7: haptic feedback on iOS
-- [ ] Item 8: loading skeletons
+- [x] Item 1: search inside saved meals — commit 858b237 — 2026-04-21
+- [x] Item 2: sort saved meals by frequency — commit 858b237 — 2026-04-21
+- [x] Item 3: duplicate entry button — commit bb210f5 — 2026-04-21
+- [x] Item 4: macro distribution donut chart — commit cfa9f4a — 2026-04-21
+- [x] Item 5: quick-add from Recents pills on HOME — commit 052a9f3 — 2026-04-21
+- [x] Item 6: pull-to-refresh on day view — commit 6508dde — 2026-04-21
+- [x] Item 7: haptic feedback on iOS — commit c96b8b7 — 2026-04-21
+- [x] Item 8: loading skeletons — commit ef7cce0 — 2026-04-21
 
 ## Tier 3
 
