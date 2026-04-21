@@ -805,6 +805,20 @@ function renderHomeTab(c) {
     <!-- Plateau banner -->
     ${c.inPlateau ? renderPlateauBanner() : ''}
 
+    <!-- Quick-add recents pills -->
+    ${(()=>{
+      const pills = state.recents.slice(0, 6);
+      if (!pills.length) return '';
+      return `<div class="mt-4 mb-1">
+        <div class="card-title mb-2">Quick add</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${pills.map((f, i) => `<button onclick="quickLogRecent(${i})" style="padding:6px 12px;background:var(--surface);border:1px solid var(--border);border-radius:20px;font-size:12px;font-weight:500;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis" title="${esc(f.name)} · ${f.calories} cal">
+            ${esc(f.name.length > 18 ? f.name.slice(0,17)+'…' : f.name)} <span style="color:var(--lime);font-family:monospace">${f.calories}</span>
+          </button>`).join('')}
+        </div>
+      </div>`;
+    })()}
+
     <!-- Today's food preview -->
     <div class="row between mt-4 mb-2">
       <div class="card-title">Today's Food</div>
@@ -2550,6 +2564,13 @@ function handleManualAdd() {
 // =====================
 // FOOD MUTATIONS
 // =====================
+async function quickLogRecent(idx) {
+  const f = state.recents[idx];
+  if (!f) return;
+  await addFoodEntry({ name: f.name, calories: f.calories, protein: f.protein||0, carbs: f.carbs||0, fat: f.fat||0 });
+  toast(`Logged ${f.name}!`, 'success');
+}
+
 async function duplicateFoodEntry(id) {
   const f = state.log.find(x => x.id === id);
   if (!f) return;
