@@ -848,7 +848,10 @@ function renderFoodLogPreview(limit) {
       </div>
       ${state.longPressId === f.id
         ? `<button class="food-row-delete-btn" onclick="event.stopPropagation(); confirmLongPressDelete(f.id)">Delete</button>`
-        : `<div class="food-row-cal">${f.calories}</div>`}
+        : `<div class="row" style="gap:4px;align-items:center">
+            <div class="food-row-cal">${f.calories}</div>
+            <button onclick="event.stopPropagation(); duplicateFoodEntry(f.id)" style="padding:5px;color:#525252" title="Log again">${icon('plus', 14)}</button>
+          </div>`}
     </div>
   `).join('')}</div>`;
 }
@@ -1090,7 +1093,10 @@ function renderFullFoodLog() {
             </div>
             ${state.longPressId === f.id
               ? `<button class="food-row-delete-btn" onclick="event.stopPropagation(); confirmLongPressDelete(f.id)">Delete</button>`
-              : `<div class="food-row-cal">${f.calories}</div>`}
+              : `<div class="row" style="gap:4px;align-items:center">
+                  <div class="food-row-cal">${f.calories}</div>
+                  <button onclick="event.stopPropagation(); duplicateFoodEntry(f.id)" style="padding:5px;color:#525252" title="Log again">${icon('plus', 14)}</button>
+                </div>`}
           </div>
         `).join('')}
       </div>
@@ -2491,6 +2497,13 @@ function handleManualAdd() {
 // =====================
 // FOOD MUTATIONS
 // =====================
+async function duplicateFoodEntry(id) {
+  const f = state.log.find(x => x.id === id);
+  if (!f) return;
+  await addFoodEntry({ name: f.name, calories: f.calories, protein: f.protein, carbs: f.carbs, fat: f.fat, category: f.category, notes: f.notes });
+  toast('Logged again!', 'success');
+}
+
 async function addFoodEntry(food) {
   const time = new Date().toISOString();
   const entry = {
