@@ -44,10 +44,10 @@ Format: `- [x] Tier N item N: description — commit <sha> — YYYY-MM-DD`
 
 ## Tier 5
 
-- [ ] Item 1: service worker for offline support
-- [ ] Item 2: iOS share sheet receiver
-- [ ] Item 3: notification reminders
-- [ ] Item 4: Apple Watch widget via Shortcut
+- [x] Item 1: service worker for offline support — commit 099e984 — 2026-04-21
+- [x] Item 2: iOS share sheet receiver — commit a4c7a51 — 2026-04-21
+- [x] Item 3: notification reminders — commit b205854 — 2026-04-21
+- [x] Item 4: Apple Watch widget via Shortcut — commit 2275106 — 2026-04-21
 
 ## Tier 6
 
