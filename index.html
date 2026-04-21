@@ -287,7 +287,7 @@ function _renderToastContainer() {
 // CLOUD STORAGE
 // =====================
 async function cloudLoadAll(userId) {
-  const out = { settings: null, weights: [], recents: [], exerciseRecents: [], plateauNotes: [], commitments: {}, photos: [], savedMeals: [], customCondiments: [] };
+  const out = { settings: null, weights: [], recents: [], exerciseRecents: [], plateauNotes: [], commitments: {}, photos: [], savedMeals: [], customCondiments: [], savedDayPlans: [] };
   const { data: settingsRow } = await sb.from('user_settings').select('settings').eq('user_id', userId).maybeSingle();
   if (settingsRow) out.settings = settingsRow.settings;
   const { data: weights } = await sb.from('weights').select('date, weight').eq('user_id', userId).order('date');
@@ -368,11 +368,23 @@ const state = {
   settingsDraft: null, settingsKeyDraft: '', showKey: false,
 
   // War Room
-  warMode: 'generate',  // generate | plan | import
+  warMode: 'generate',  // generate | plan | import | planlab
   warPrompt: '',
   warImportInput: '',
   warResults: [],
   warPlanResults: null,
+
+  // Plan Lab (Tier 1 item 7)
+  planLabMode: 'mixmatch',   // mixmatch | builder | discover
+  planLabSelection: [],      // array of saved meal IDs
+  savedDayPlans: [],         // saved day plan templates
+  planLabBuilderPrompt: '',
+  planLabBuilderConstraints: { cuisine: '', dietary: '', prepTime: '', mealCount: '4' },
+  planLabBuilderResults: [],
+  planLabDiscoverQuery: '',
+  planLabDiscoverResults: [],
+  planLabSaveName: '',
+  planLabPendingLog: null,
 
   analyzing: false, error: '',
   micListening: false,
@@ -1513,6 +1525,8 @@ function renderModals() {
     ${state.modal === 'photoView' ? renderPhotoViewModal() : ''}
     ${state.modal === 'photoCompare' ? renderPhotoCompareModal() : ''}
     ${state.modal === 'weeklyReview' ? renderWeeklyReviewModal() : ''}
+    ${state.modal === 'saveDayPlan' ? renderSaveDayPlanModal() : ''}
+    ${state.modal === 'confirmLogDayPlan' ? renderConfirmLogDayPlanModal() : ''}
   `;
 }
 
@@ -3034,6 +3048,7 @@ async function onSignedIn() {
     state.photos = all.photos || [];
     state.savedMeals = all.savedMeals || [];
     state.customCondiments = all.customCondiments || [];
+    state.savedDayPlans = all.savedDayPlans || [];
 
     if (!all.settings && hasLegacyLocalData()) state.migrationPrompt = true;
 
@@ -3088,6 +3103,7 @@ function renderWarRoomTab(c) {
     { id: 'generate', label: 'Generate', icon: 'sparkles' },
     { id: 'plan',     label: 'Plan Day', icon: 'target' },
     { id: 'import',   label: 'Import',   icon: 'image' },
+    { id: 'planlab',  label: 'Plan Lab', icon: 'grid' },
   ];
   return `
     <div class="row between mb-3">
@@ -3098,12 +3114,13 @@ function renderWarRoomTab(c) {
     </div>
 
     <div class="segments mb-3">
-      ${modes.map(m => `<button class="seg ${state.warMode === m.id ? 'active' : ''}" onclick="state.warMode='${m.id}'; state.warResults=[]; state.warPlanResults=null; state.error=''; render()">${m.label}</button>`).join('')}
+      ${modes.map(m => `<button class="seg ${state.warMode === m.id ? 'active' : ''}" onclick="state.warMode='${m.id}'; state.warResults=[]; state.warPlanResults=null; state.error=''; state.planLabSaveName=''; render()">${m.label}</button>`).join('')}
     </div>
 
     ${state.warMode === 'generate' ? renderWarGenerate(c) : ''}
     ${state.warMode === 'plan' ? renderWarPlan(c) : ''}
     ${state.warMode === 'import' ? renderWarImport(c) : ''}
+    ${state.warMode === 'planlab' ? renderWarPlanLab(c) : ''}
 
     ${!state.apiKey ? `
       <div class="banner banner-warn mt-3">
@@ -3247,6 +3264,285 @@ function renderWarMealResults(mode) {
 }
 
 // =====================
+function renderSaveDayPlanModal() {
+  return `<div class="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="sheet" style="max-height:50vh">
+      <div class="sheet-head">
+        <div style="font-size:18px;font-weight:700">Save Day Plan</div>
+        <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+      </div>
+      <div class="sheet-body">
+        <div class="mb-3">
+          <label class="field-label">Plan name</label>
+          <input id="day-plan-name" class="field" type="text" value="${esc(state.planLabSaveName)}" placeholder='e.g. "Cut Day", "Refeed", "High Protein"' oninput="state.planLabSaveName = this.value" onkeydown="if(event.key==='Enter') saveDayPlanFromSelection()"/>
+        </div>
+        <div class="small text-3 mb-4">${state.planLabSelection.length} meal${state.planLabSelection.length!==1?'s':''} · ${state.planLabSelection.map(id=>state.savedMeals.find(m=>m.id===id)?.name).filter(Boolean).join(', ')}</div>
+        <button class="btn btn-primary" style="width:100%" onclick="saveDayPlanFromSelection()">Save</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderConfirmLogDayPlanModal() {
+  const p = state.planLabPendingLog;
+  if (!p) return '';
+  return `<div class="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="sheet" style="max-height:60vh">
+      <div class="sheet-head">
+        <div style="font-size:18px;font-weight:700">Log to today?</div>
+        <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+      </div>
+      <div class="sheet-body">
+        <div class="small text-3 mb-3">This will add all items from the following meals to today's log:</div>
+        <div class="space-y-2 mb-4">
+          ${(p.names || []).map(name => `<div class="row" style="gap:8px"><div style="color:var(--lime)">${icon('check', 13, '#c4ff3f')}</div><div class="small">${esc(name)}</div></div>`).join('')}
+        </div>
+        <div class="row" style="gap:8px">
+          <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" style="flex:1" onclick="executeDayPlanLog()">${icon('plus', 14, '#000')} Log all</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// =====================
+// PLAN LAB
+// =====================
+function renderWarPlanLab(c) {
+  const subModes = [
+    { id: 'mixmatch', label: 'Mix & Match' },
+    { id: 'builder',  label: 'AI Builder' },
+    { id: 'discover', label: 'Discover' },
+  ];
+  return `
+    <div class="segments mb-3">
+      ${subModes.map(m => `<button class="seg ${state.planLabMode === m.id ? 'active' : ''}" onclick="state.planLabMode='${m.id}'; state.error=''; render()">${m.label}</button>`).join('')}
+    </div>
+    ${state.planLabMode === 'mixmatch' ? renderPlanLabMixMatch(c) : ''}
+    ${state.planLabMode === 'builder'  ? renderPlanLabBuilder(c) : ''}
+    ${state.planLabMode === 'discover' ? renderPlanLabDiscover(c) : ''}
+  `;
+}
+
+function renderPlanLabMixMatch(c) {
+  const meals = state.savedMeals;
+  const sel = state.planLabSelection;
+  const s = state.settings;
+
+  // Running totals from selected meals
+  const totals = sel.reduce((acc, id) => {
+    const m = meals.find(x => x.id === id);
+    if (!m) return acc;
+    const mt = (m.items || []).reduce((a, it) => ({
+      cal: a.cal + (it.calories || 0),
+      p: a.p + (it.protein || 0),
+      c: a.c + (it.carbs || 0),
+      f: a.f + (it.fat || 0),
+    }), { cal: 0, p: 0, c: 0, f: 0 });
+    return { cal: acc.cal + mt.cal, p: acc.p + mt.p, c: acc.c + mt.c, f: acc.f + mt.f };
+  }, { cal: 0, p: 0, c: 0, f: 0 });
+
+  function statusColor(val, target) {
+    const pct = val / target;
+    if (pct > 1.1) return '#ef4444';
+    if (pct > 0.9) return 'var(--lime)';
+    return '#f59e0b';
+  }
+
+  // Saved day plans section
+  const dayPlansHtml = state.savedDayPlans.length ? `
+    <div class="card mb-3">
+      <div class="card-title mb-2">${icon('layers', 11, '#c4ff3f')} Saved Day Plans</div>
+      <div class="space-y-2">
+        ${state.savedDayPlans.map((dp, i) => {
+          const dpTotals = (dp.mealIds || []).reduce((acc, id) => {
+            const m = meals.find(x => x.id === id);
+            if (!m) return acc;
+            const mt = (m.items || []).reduce((a, it) => ({ cal: a.cal + (it.calories||0), p: a.p + (it.protein||0) }), { cal:0, p:0 });
+            return { cal: acc.cal + mt.cal, p: acc.p + mt.p };
+          }, { cal: 0, p: 0 });
+          return `<div class="row between" style="padding:10px;background:var(--surface-2);border-radius:8px">
+            <div class="flex1">
+              <div class="small" style="font-weight:600">${esc(dp.name)}</div>
+              <div class="tiny text-3 mono mt-1">${dpTotals.cal} cal · P${dpTotals.p} · ${dp.mealIds.length} meals</div>
+            </div>
+            <div class="row" style="gap:6px">
+              <button class="btn-sm btn-ghost" onclick="loadDayPlan(${i})">Load</button>
+              <button class="btn-sm btn-ghost" onclick="confirmLogDayPlan(${i})" style="color:var(--lime)">${icon('plus', 12, '#c4ff3f')} Log</button>
+              <button onclick="deleteDayPlan(${i})" style="padding:4px;color:#525252">${icon('trash', 13)}</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  if (meals.length === 0) {
+    return `<div class="card"><div class="empty-state"><div class="text-3 small">No saved meals yet. Build some in the Meals tab first.</div></div></div>`;
+  }
+
+  return `
+    ${dayPlansHtml}
+
+    <div class="card mb-3">
+      <div class="card-title mb-2">Select meals to combine</div>
+      <div class="text-3 small mb-3">Tap meals to add or remove them. See live macro totals below.</div>
+      <div class="space-y-2">
+        ${meals.map(m => {
+          const isSelected = sel.includes(m.id);
+          const mt = (m.items || []).reduce((a, it) => ({
+            cal: a.cal + (it.calories||0), p: a.p + (it.protein||0), c: a.c + (it.carbs||0), f: a.f + (it.fat||0)
+          }), { cal:0, p:0, c:0, f:0 });
+          return `<div onclick="togglePlanLabMeal(${m.id})" style="padding:12px 14px;border-radius:10px;border:1.5px solid ${isSelected ? 'var(--lime)' : 'var(--border)'};background:${isSelected ? 'rgba(196,255,63,0.06)' : 'var(--surface)'};cursor:pointer;display:flex;align-items:center;gap:12px">
+            <div style="width:18px;height:18px;border-radius:50%;border:2px solid ${isSelected ? 'var(--lime)' : '#525252'};background:${isSelected ? 'var(--lime)' : 'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              ${isSelected ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
+            </div>
+            <div class="flex1">
+              <div class="small" style="font-weight:600">${esc(m.name)}</div>
+              <div class="tiny text-3 mono mt-1">${mt.cal} cal · P${mt.p} C${mt.c} F${mt.f}</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    ${sel.length > 0 ? `
+      <!-- Sticky totals bar -->
+      <div style="position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--border);padding:12px 0;margin:0 -20px;padding:12px 20px;">
+        <div class="row between mb-2">
+          <div class="small text-3">${sel.length} meal${sel.length > 1 ? 's' : ''} selected</div>
+          <div class="small mono" style="color:${statusColor(totals.cal, s.calorieTarget)};font-weight:700">${totals.cal} / ${s.calorieTarget} cal</div>
+        </div>
+        <div class="row" style="gap:8px;margin-bottom:12px">
+          ${[['P', totals.p, s.proteinTarget], ['C', totals.c, s.carbTarget], ['F', totals.f, s.fatTarget]].map(([label, val, target]) => `
+            <div style="flex:1;text-align:center">
+              <div class="tiny text-3">${label}</div>
+              <div class="small mono" style="color:${statusColor(val, target)}">${val}g</div>
+              <div style="height:3px;background:var(--surface-3);border-radius:2px;margin-top:4px;overflow:hidden">
+                <div style="height:100%;background:${statusColor(val, target)};width:${Math.min(val/target*100,100)}%"></div>
+              </div>
+            </div>`).join('')}
+        </div>
+        <div class="row" style="gap:6px;margin-bottom:8px">
+          <button class="btn btn-ghost btn-sm" style="flex:1" onclick="suggestMealSwap()" ${state.analyzing ? 'disabled' : ''}>
+            ${state.analyzing ? icon('loader', 13, 'currentColor', 2, 'spin') : icon('sparkles', 13, '#737373')} Swap idea
+          </button>
+          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="state.planLabSaveName=state.planLabSaveName||'';state.modal='saveDayPlan';render()">
+            ${icon('layers', 13)} Save plan
+          </button>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="confirmLogDayPlanFromSelection()">
+            ${icon('plus', 13, '#000')} Log all
+          </button>
+        </div>
+        ${state.error ? `<div class="error" style="font-size:12px">${esc(state.error)}</div>` : ''}
+      </div>
+    ` : ''}
+  `;
+}
+
+function togglePlanLabMeal(id) {
+  if (state.planLabSelection.includes(id)) {
+    state.planLabSelection = state.planLabSelection.filter(x => x !== id);
+  } else {
+    state.planLabSelection = [...state.planLabSelection, id];
+  }
+  render();
+}
+
+async function suggestMealSwap() {
+  if (!state.apiKey) { toast('Add your Anthropic API key in Settings.', 'error'); return; }
+  if (state.planLabSelection.length < 2) { toast('Select at least 2 meals to get a swap suggestion.', 'info'); return; }
+  state.analyzing = true; state.error = ''; render();
+  try {
+    const s = state.settings;
+    const meals = state.savedMeals;
+    const selectedMeals = state.planLabSelection.map(id => {
+      const m = meals.find(x => x.id === id);
+      const cal = (m?.items || []).reduce((a, it) => a + (it.calories||0), 0);
+      const p = (m?.items || []).reduce((a, it) => a + (it.protein||0), 0);
+      return `${m?.name} (${cal} cal, P${p})`;
+    });
+    const totals = state.planLabSelection.reduce((acc, id) => {
+      const m = meals.find(x => x.id === id);
+      const mt = (m?.items || []).reduce((a, it) => ({ cal: a.cal+(it.calories||0), p: a.p+(it.protein||0) }), { cal:0, p:0 });
+      return { cal: acc.cal+mt.cal, p: acc.p+mt.p };
+    }, { cal:0, p:0 });
+    const prompt = `I'm selecting these meals for my day: ${selectedMeals.join(', ')}. Total: ${totals.cal} cal, P${totals.p}. My daily target is ${s.calorieTarget} cal / P${s.proteinTarget}g. Which one meal should I swap out to get closer to my targets, and what should I replace it with (from my same general food preferences)? Reply in 2 sentences max.`;
+    const result = await callClaude({ model: MODEL, max_tokens: 150, messages: [{ role: 'user', content: prompt }] });
+    state.error = result; // reuse error field for inline display since it's non-fatal
+  } catch (e) { state.error = e.message; }
+  finally { state.analyzing = false; render(); }
+}
+
+async function saveDayPlanFromSelection() {
+  const name = state.planLabSaveName.trim();
+  if (!name) { toast('Give your plan a name.', 'info'); return; }
+  if (state.planLabSelection.length === 0) { toast('Select at least one meal.', 'info'); return; }
+  const plan = { id: Date.now(), name, mealIds: [...state.planLabSelection], createdAt: new Date().toISOString(), usageCount: 0 };
+  state.savedDayPlans = [...state.savedDayPlans, plan];
+  state.planLabSaveName = '';
+  state.modal = null;
+  render();
+  try { await cloudSaveData(state.user.id, 'savedDayPlans', state.savedDayPlans); toast('Day plan saved!', 'success'); }
+  catch (e) { toast('Save failed: ' + e.message, 'error'); }
+}
+
+function loadDayPlan(idx) {
+  const dp = state.savedDayPlans[idx];
+  if (!dp) return;
+  state.planLabSelection = [...(dp.mealIds || [])];
+  render();
+  toast(`Loaded "${dp.name}"`, 'success');
+}
+
+function deleteDayPlan(idx) {
+  state.savedDayPlans = state.savedDayPlans.filter((_, i) => i !== idx);
+  render();
+  cloudSaveData(state.user.id, 'savedDayPlans', state.savedDayPlans).catch(e => toast('Save failed: ' + e.message, 'error'));
+}
+
+function confirmLogDayPlanFromSelection() {
+  if (state.planLabSelection.length === 0) return;
+  const names = state.planLabSelection.map(id => state.savedMeals.find(m => m.id === id)?.name).filter(Boolean);
+  state.modal = 'confirmLogDayPlan';
+  state.planLabPendingLog = { source: 'selection', mealIds: [...state.planLabSelection], names };
+  render();
+}
+
+function confirmLogDayPlan(idx) {
+  const dp = state.savedDayPlans[idx];
+  if (!dp) return;
+  const names = (dp.mealIds || []).map(id => state.savedMeals.find(m => m.id === id)?.name).filter(Boolean);
+  state.modal = 'confirmLogDayPlan';
+  state.planLabPendingLog = { source: 'plan', mealIds: [...(dp.mealIds || [])], names, planIdx: idx };
+  render();
+}
+
+async function executeDayPlanLog() {
+  const pending = state.planLabPendingLog;
+  if (!pending) return;
+  closeModal();
+  let logged = 0;
+  for (const id of pending.mealIds) {
+    const m = state.savedMeals.find(x => x.id === id);
+    if (!m) continue;
+    const cat = m.category || inferCategory(new Date().toISOString());
+    for (const item of (m.items || [])) {
+      await addFoodEntry({ ...item, category: cat });
+      logged++;
+    }
+  }
+  // Increment usage count if from a plan
+  if (pending.source === 'plan' && pending.planIdx != null) {
+    state.savedDayPlans = state.savedDayPlans.map((dp, i) => i === pending.planIdx ? { ...dp, usageCount: (dp.usageCount||0) + 1 } : dp);
+    cloudSaveData(state.user.id, 'savedDayPlans', state.savedDayPlans).catch(() => {});
+  }
+  state.planLabPendingLog = null;
+  toast(`Logged ${logged} items to today!`, 'success');
+  goTab('log');
+}
+
 // WAR ROOM AI
 // =====================
 async function generateMealsAPI(prompt, opts = {}) {
