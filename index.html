@@ -163,6 +163,10 @@
   #ptr-indicator { position: fixed; top: 0; left: 50%; transform: translateX(-50%) translateY(-48px); background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 6px 16px; font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 6px; z-index: 150; transition: transform 0.15s ease; pointer-events: none; }
   #ptr-indicator.visible { transform: translateX(-50%) translateY(12px); }
 
+  /* Shimmer skeleton */
+  @keyframes shimmer { 0% { background-position: -300px 0; } 100% { background-position: 300px 0; } }
+  .skeleton { background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%); background-size: 600px 100%; animation: shimmer 1.4s infinite; border-radius: 6px; }
+
   /* Long-press delete */
   .food-row-deleting { border-color: #ef4444 !important; background: rgba(239,68,68,0.08) !important; }
   .food-row-delete-btn { background: #ef4444; color: #fff; border: none; border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
@@ -369,7 +373,7 @@ async function cloudSaveWeight(uid, date, weight) { await sb.from('weights').ups
 const state = {
   authReady: false, user: null,
   authEmail: '', authPassword: '', authMode: 'signin', authError: '', authBusy: false,
-  loadingCloud: false, migrationPrompt: false,
+  loadingCloud: false, loadingDay: false, migrationPrompt: false,
 
   apiKey: load('apiKey', ''),
   settings: { ...DEFAULT_SETTINGS },
@@ -867,7 +871,7 @@ function renderHomeTab(c) {
       <div class="card-title">Today's Food</div>
       <button class="btn-sm btn-ghost" onclick="goTab('log')">View all →</button>
     </div>
-    ${state.log.length === 0 ? `
+    ${state.loadingDay ? renderFoodSkeleton(3) : state.log.length === 0 ? `
       <div class="empty-state card">
         <div class="text-3 small">No food logged yet today.</div>
         <button class="btn btn-primary mt-3" onclick="goTab('log')">${icon('plus', 16)} Log first meal</button>
@@ -943,6 +947,19 @@ function macroBar(label, value, target, color, ico) {
   `;
 }
 
+function renderFoodSkeleton(count) {
+  const rows = Array.from({ length: count }, () => `
+    <div class="food-row" style="pointer-events:none">
+      <div class="skeleton" style="width:8px;height:8px;border-radius:50%;flex-shrink:0"></div>
+      <div class="flex1" style="display:flex;flex-direction:column;gap:5px">
+        <div class="skeleton" style="height:13px;width:60%;border-radius:4px"></div>
+        <div class="skeleton" style="height:10px;width:40%;border-radius:4px"></div>
+      </div>
+      <div class="skeleton" style="height:18px;width:32px;border-radius:4px"></div>
+    </div>`).join('');
+  return `<div class="space-y-2">${rows}</div>`;
+}
+
 function renderFoodLogPreview(limit) {
   const recent = state.log.slice(-limit).reverse();
   return `<div class="space-y-2">${recent.map(f => `
@@ -1013,7 +1030,7 @@ function renderLogTab(c) {
         <div class="card-title">Today's Log · ${state.log.length} ${state.log.length === 1 ? 'item' : 'items'}</div>
         <div class="text-3 small mono">${c.totals.calories} cal</div>
       </div>
-      ${renderFullFoodLog()}
+      ${state.loadingDay ? renderFoodSkeleton(4) : renderFullFoodLog()}
     </div>
   `;
 }
@@ -2238,13 +2255,14 @@ async function useForgiveness(date) {
 async function loadDay(date) {
   state.viewDate = date;
   state.log = []; state.water = 0; state.exercise = [];
+  state.loadingDay = true;
   render();
-  if (!state.user) return;
+  if (!state.user) { state.loadingDay = false; return; }
   try {
     const { log, exercise, water } = await cloudLoadDay(state.user.id, date);
     state.log = log; state.exercise = exercise; state.water = water;
-    render();
   } catch (e) { console.error('loadDay failed', e); }
+  finally { state.loadingDay = false; render(); }
 }
 
 function openModal(name, data) {
