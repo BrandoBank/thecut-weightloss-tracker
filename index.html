@@ -247,6 +247,8 @@ const todayKey = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.g
 const load = (k, f) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : f; } catch { return f; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const haptic = (ms = 10) => { try { navigator.vibrate?.(ms); } catch {} };
+
 const inferCategory = (iso) => {
   const h = new Date(iso).getHours() + new Date(iso).getMinutes() / 60;
   if (h >= 4 && h < 10.5) return 'breakfast';
@@ -2637,6 +2639,11 @@ async function addFoodEntry(food) {
   try {
     const id = await cloudAddFood(state.user.id, state.viewDate, entry);
     state.log = state.log.map(f => f.id === tempId ? { ...f, id } : f);
+    haptic();
+    // Extra buzz when calorie target is first crossed
+    const netNow = state.log.reduce((a,f) => a+(f.calories||0), 0) - state.exercise.reduce((a,e) => a+(e.calories||0), 0);
+    const netBefore = netNow - (entry.calories||0);
+    if (netNow >= state.settings.calorieTarget && netBefore < state.settings.calorieTarget) haptic(30);
     const clean = { name: entry.name, calories: entry.calories, protein: entry.protein, carbs: entry.carbs, fat: entry.fat };
     const filtered = state.recents.filter(r => r.name.toLowerCase() !== clean.name.toLowerCase());
     state.recents = [clean, ...filtered].slice(0, 20);
@@ -2746,6 +2753,7 @@ async function saveWeight() {
   const today = todayKey();
   state.weights = [...state.weights.filter(x => x.date !== today), { date: today, weight: w }].sort((a, b) => a.date.localeCompare(b.date));
   closeModal();
+  haptic(15);
   try { await cloudSaveWeight(state.user.id, today, w); }
   catch (e) { toast('Save failed: ' + e.message, 'error'); }
 }
