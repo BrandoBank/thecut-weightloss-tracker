@@ -161,6 +161,8 @@
   @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
   /* Pull-to-refresh */
+  .skip-link { position: absolute; top: -100%; left: 8px; background: var(--lime); color: #000; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; z-index: 9999; transition: top 0.1s; }
+  .skip-link:focus { top: 8px; }
   #ptr-indicator { position: fixed; top: 0; left: 50%; transform: translateX(-50%) translateY(-48px); background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 6px 16px; font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 6px; z-index: 150; transition: transform 0.15s ease; pointer-events: none; }
   #ptr-indicator.visible { transform: translateX(-50%) translateY(12px); }
 
@@ -200,7 +202,8 @@
 </style>
 </head>
 <body>
-<div id="app"></div>
+<a href="#app" class="skip-link">Skip to content</a>
+<div id="app" role="main" aria-live="polite" aria-atomic="false"></div>
 <script>
 // =====================
 // LOGOS (embedded)
@@ -275,6 +278,13 @@ const load = (k, f) => { try { const v = localStorage.getItem(k); return v ? JSO
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const haptic = (ms = 10) => { try { navigator.vibrate?.(ms); } catch {} };
+
+// Debounced render for high-frequency inputs — avoids cursor-jump on every keystroke
+const _debounceTimers = {};
+function debounceRender(key, ms = 120) {
+  clearTimeout(_debounceTimers[key]);
+  _debounceTimers[key] = setTimeout(render, ms);
+}
 
 const _CAT_KEYWORDS = {
   breakfast: /\b(egg|eggs|omelet|omelette|oatmeal|pancake|waffle|french toast|bagel|toast|cereal|granola|yogurt|yoghurt|parfait|smoothie bowl|acai|muffin|croissant|crepe|biscuit|grits|hash brown|hashbrown|bacon|sausage|breakfast burrito|breakfast sandwich)\b/i,
@@ -760,7 +770,7 @@ function render() {
 
 function renderBoot(msg) {
   return `<div class="welcome"><div class="welcome-inner" style="text-align:center">
-    <img class="welcome-logo" src="${BEE_FLYING}" alt=""/>
+    <img class="welcome-logo" src="${BEE_FLYING}" alt="The Cut. logo" role="img"/>
     <div class="display" style="font-size:32px;margin-bottom:16px">The Cut.</div>
     <div class="row" style="gap:10px;justify-content:center;color:#a3a3a3">
       ${icon('loader', 16, '#c4ff3f', 2, 'spin')}
@@ -830,13 +840,13 @@ function renderApp() {
 
     ${renderStatusStrip(c)}
 
-    <div class="tabbar" id="tabbar">
+    <nav class="tabbar" id="tabbar" aria-label="Main navigation">
       ${tabs.map(t => `
-        <button class="tab ${state.activeTab === t.id ? 'active' : ''}" onclick="goTab('${t.id}')">
+        <button class="tab ${state.activeTab === t.id ? 'active' : ''}" onclick="goTab('${t.id}')" aria-label="${t.label}" aria-current="${state.activeTab === t.id ? 'page' : 'false'}">
           ${icon(t.icon, 13)}<span>${t.label}</span>
         </button>
       `).join('')}
-    </div>
+    </nav>
 
     <div class="body">
       ${state.migrationPrompt ? `
@@ -850,7 +860,7 @@ function renderApp() {
       ${renderTab(state.activeTab, c)}
     </div>
 
-    ${state.activeTab === 'home' ? `<button class="fab" onclick="goTab('log')">${icon('plus', 24, '#000', 2.5)}</button>` : ''}
+    ${state.activeTab === 'home' ? `<button class="fab" onclick="goTab('log')" aria-label="Log food">${icon('plus', 24, '#000', 2.5)}</button>` : ''}
 
     ${renderModals()}
   `;
@@ -1210,7 +1220,7 @@ function renderSearchMode() {
   return `
     <div class="field-wrap">
       <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);z-index:1">${icon('search', 17, '#737373')}</span>
-      <input id="search-input" class="field" type="text" value="${esc(state.searchInput)}" placeholder="Search foods or anything…" oninput="state.searchInput = this.value; render()" onkeydown="if(event.key==='Enter') handleSearch()" style="padding-left:44px" ${state.analyzing ? 'disabled' : ''} autofocus/>
+      <input id="search-input" class="field" type="text" value="${esc(state.searchInput)}" placeholder="Search foods or anything…" oninput="state.searchInput = this.value; debounceRender('search')" onkeydown="if(event.key==='Enter') handleSearch()" style="padding-left:44px" ${state.analyzing ? 'disabled' : ''} autofocus/>
     </div>
 
     ${mineMatches.length > 0 ? `
@@ -1741,7 +1751,7 @@ function renderSavedMealsSection() {
     <div class="row between mb-3" style="gap:8px">
       <div class="field-wrap flex1" style="position:relative;margin:0">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%)">${icon('search', 15, '#737373')}</span>
-        <input class="field" style="padding-left:36px;padding-top:8px;padding-bottom:8px" type="text" value="${esc(state.savedMealsSearch)}" placeholder="Search meals or ingredients…" oninput="state.savedMealsSearch = this.value; render()"/>
+        <input class="field" style="padding-left:36px;padding-top:8px;padding-bottom:8px" type="text" value="${esc(state.savedMealsSearch)}" placeholder="Search meals or ingredients…" oninput="state.savedMealsSearch = this.value; debounceRender('mealsSearch')"/>
         ${state.savedMealsSearch ? `<button onclick="state.savedMealsSearch='';render()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#737373">${icon('x', 14)}</button>` : ''}
       </div>
       ${state.savedMealsSelectMode
@@ -2119,7 +2129,7 @@ function renderPreLogModal() {
       <div class="sheet">
         <div class="sheet-head">
           <h3 class="display">Confirm & log</h3>
-          <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+          <button onclick="closeModal()" aria-label="Close" style="padding:4px;color:#737373">${icon('x', 20)}</button>
         </div>
         <div class="sheet-body">
           <div class="text-3 small mb-3">Edit values if the estimate looks off, then save.</div>
@@ -2165,7 +2175,7 @@ function renderEditModal() {
       <div class="sheet">
         <div class="sheet-head">
           <h3 class="display">Edit entry</h3>
-          <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+          <button onclick="closeModal()" aria-label="Close" style="padding:4px;color:#737373">${icon('x', 20)}</button>
         </div>
         <div class="sheet-body">
           <div class="space-y-3">
@@ -2196,7 +2206,7 @@ function renderWeightModal() {
       <div class="sheet">
         <div class="sheet-head">
           <h3 class="display">Log weight</h3>
-          <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+          <button onclick="closeModal()" aria-label="Close" style="padding:4px;color:#737373">${icon('x', 20)}</button>
         </div>
         <div class="sheet-body">
           <input id="weight-input" class="field display" type="number" step="0.1" value="${esc(state.newWeight)}" placeholder="244.0" oninput="state.newWeight = this.value; updateWeightButton()" style="font-size:32px;text-align:center;padding:20px" autofocus/>
@@ -2228,7 +2238,7 @@ function renderMealBuilderModal() {
       <div class="sheet">
         <div class="sheet-head">
           <h3 class="display">${state.editingMealId ? 'Edit' : 'New'} meal</h3>
-          <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+          <button onclick="closeModal()" aria-label="Close" style="padding:4px;color:#737373">${icon('x', 20)}</button>
         </div>
         <div class="sheet-body">
           <div class="space-y-3">
@@ -2298,7 +2308,7 @@ function renderMealBuilderModal() {
             <div class="card-title mb-2">Add an item</div>
             <div class="field-wrap">
               <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);z-index:1">${icon('search', 16, '#737373')}</span>
-              <input class="field" type="text" value="${esc(state.mealBuilderSearch)}" placeholder="Search your foods or anything…" oninput="state.mealBuilderSearch = this.value; render()" style="padding-left:40px"/>
+              <input class="field" type="text" value="${esc(state.mealBuilderSearch)}" placeholder="Search your foods or anything…" oninput="state.mealBuilderSearch = this.value; debounceRender('builderSearch')" style="padding-left:40px"/>
             </div>
 
             ${matches.length > 0 ? `
@@ -2354,7 +2364,7 @@ function renderPlateauModal() {
       <div class="sheet">
         <div class="sheet-head">
           <h3 class="display">Journal a trigger</h3>
-          <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+          <button onclick="closeModal()" aria-label="Close" style="padding:4px;color:#737373">${icon('x', 20)}</button>
         </div>
         <div class="sheet-body">
           <div class="text-3 small mb-3">What may have triggered today's plateau? Pick all that apply.</div>
@@ -2378,7 +2388,7 @@ function renderPlateauListModal() {
       <div class="sheet">
         <div class="sheet-head">
           <h3 class="display">Plateau Journal</h3>
-          <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+          <button onclick="closeModal()" aria-label="Close" style="padding:4px;color:#737373">${icon('x', 20)}</button>
         </div>
         <div class="sheet-body">
           <div class="space-y-2">${state.plateauNotes.slice().reverse().map(n => `
@@ -2405,7 +2415,7 @@ function renderExerciseManualModal() {
       <div class="sheet">
         <div class="sheet-head">
           <h3 class="display">Manual exercise</h3>
-          <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+          <button onclick="closeModal()" aria-label="Close" style="padding:4px;color:#737373">${icon('x', 20)}</button>
         </div>
         <div class="sheet-body">
           <div class="space-y-3">
@@ -2442,7 +2452,7 @@ function renderPhotoCompareModal() {
       <div class="sheet">
         <div class="sheet-head">
           <h3 class="display">Compare</h3>
-          <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+          <button onclick="closeModal()" aria-label="Close" style="padding:4px;color:#737373">${icon('x', 20)}</button>
         </div>
         <div class="sheet-body">
           ${state.photoCompareSelection.length === 2 ? `
@@ -2741,7 +2751,7 @@ function renderWeeklyReviewModal() {
     <div class="sheet" style="max-height:85vh">
       <div class="sheet-head">
         <div style="font-size:18px;font-weight:700">Weekly Debrief</div>
-        <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+        <button onclick="closeModal()" aria-label="Close" style="padding:4px;color:#737373">${icon('x', 20)}</button>
       </div>
       <div class="sheet-body">
         ${loading ? `
@@ -3302,7 +3312,7 @@ async function logSavedMeal(id) {
   }
   // Track usage frequency
   state.savedMeals = state.savedMeals.map(x => x.id === id ? { ...x, usageCount: (x.usageCount||0) + 1 } : x);
-  cloudSaveData(state.user.id, 'savedMeals', state.savedMeals).catch(() => {});
+  cloudSaveData(state.user.id, 'savedMeals', state.savedMeals).catch(e => console.warn('[thecut] savedMeals sync failed', e));
 }
 
 function toggleMealSelect(id) {
@@ -3596,7 +3606,7 @@ async function handleUrlParams() {
     if (!isNaN(cal) && cal > 0) {
       // If replace=1, remove any existing entry with same name first
       if (replace) {
-        const existing = state.exercise.filter(e => e.name === name);
+        const existing = state.exercise.filter(e => e.name.trim().toLowerCase() === name.trim().toLowerCase());
         for (const ex of existing) {
           state.exercise = state.exercise.filter(e => e.id !== ex.id);
           try { await cloudDeleteExercise(state.user.id, ex.id); } catch {}
@@ -3891,7 +3901,7 @@ function renderSaveDayPlanModal() {
     <div class="sheet" style="max-height:50vh">
       <div class="sheet-head">
         <div style="font-size:18px;font-weight:700">Save Day Plan</div>
-        <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+        <button onclick="closeModal()" aria-label="Close" style="padding:4px;color:#737373">${icon('x', 20)}</button>
       </div>
       <div class="sheet-body">
         <div class="mb-3">
@@ -3912,7 +3922,7 @@ function renderConfirmLogDayPlanModal() {
     <div class="sheet" style="max-height:60vh">
       <div class="sheet-head">
         <div style="font-size:18px;font-weight:700">Log to today?</div>
-        <button onclick="closeModal()" style="padding:4px;color:#737373">${icon('x', 20)}</button>
+        <button onclick="closeModal()" aria-label="Close" style="padding:4px;color:#737373">${icon('x', 20)}</button>
       </div>
       <div class="sheet-body">
         <div class="small text-3 mb-3">This will add all items from the following meals to today's log:</div>
@@ -4165,7 +4175,7 @@ async function executeDayPlanLog() {
     // Increment usage count if from a saved day plan
     if (pending.source === 'plan' && pending.planIdx != null) {
       state.savedDayPlans = state.savedDayPlans.map((dp, i) => i === pending.planIdx ? { ...dp, usageCount: (dp.usageCount||0) + 1 } : dp);
-      cloudSaveData(state.user.id, 'savedDayPlans', state.savedDayPlans).catch(() => {});
+      cloudSaveData(state.user.id, 'savedDayPlans', state.savedDayPlans).catch(e => console.warn('[thecut] savedDayPlans sync failed', e));
     }
   }
   state.planLabPendingLog = null;
@@ -4718,6 +4728,17 @@ function applyAccentColor(color) {
 }
 
 init();
+
+// ── Sentry-lite: global error capture ────────────────────────────────────────
+const _errorLog = [];
+function _captureError(msg, src, line, col, err) {
+  const entry = { ts: new Date().toISOString(), msg: String(msg), src, line, err: err?.stack || '' };
+  _errorLog.push(entry);
+  if (_errorLog.length > 50) _errorLog.shift(); // keep last 50
+  console.error('[thecut]', msg, err || '');
+}
+window.onerror = (msg, src, line, col, err) => { _captureError(msg, src, line, col, err); return false; };
+window.onunhandledrejection = e => _captureError(e.reason?.message || String(e.reason), 'promise', 0, 0, e.reason);
 
 // ── Reminder helpers ─────────────────────────────────────────────────────────
 function toggleReminder(i, enabled) {
