@@ -386,6 +386,10 @@ const state = {
   planLabSaveName: '',
   planLabPendingLog: null,
 
+  // Meals tab
+  savedMealsSearch: '',
+  savedMealsSort: 'frequency',  // 'frequency' | 'alpha' | 'recent'
+
   analyzing: false, error: '',
   micListening: false,
   longPressId: null,
@@ -1370,13 +1374,43 @@ function renderSavedMealsSection() {
       </div>
     `;
   }
+
+  // Filter
+  const q = state.savedMealsSearch.toLowerCase().trim();
+  let meals = q
+    ? state.savedMeals.filter(m =>
+        m.name.toLowerCase().includes(q) ||
+        (m.items || []).some(it => it.name.toLowerCase().includes(q))
+      )
+    : [...state.savedMeals];
+
+  // Sort
+  if (state.savedMealsSort === 'frequency') meals.sort((a, b) => (b.usageCount||0) - (a.usageCount||0));
+  else if (state.savedMealsSort === 'alpha') meals.sort((a, b) => a.name.localeCompare(b.name));
+  // 'recent' keeps insertion order (no sort)
+
   return `
+    <div class="row between mb-3" style="gap:8px">
+      <div class="field-wrap flex1" style="position:relative;margin:0">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%)">${icon('search', 15, '#737373')}</span>
+        <input class="field" style="padding-left:36px;padding-top:8px;padding-bottom:8px" type="text" value="${esc(state.savedMealsSearch)}" placeholder="Search meals or ingredients…" oninput="state.savedMealsSearch = this.value; render()"/>
+        ${state.savedMealsSearch ? `<button onclick="state.savedMealsSearch='';render()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#737373">${icon('x', 14)}</button>` : ''}
+      </div>
+      <select class="field" style="width:auto;padding:8px 10px;flex-shrink:0" onchange="state.savedMealsSort=this.value;render()">
+        <option value="frequency" ${state.savedMealsSort==='frequency'?'selected':''}>Most used</option>
+        <option value="alpha" ${state.savedMealsSort==='alpha'?'selected':''}>A–Z</option>
+        <option value="recent" ${state.savedMealsSort==='recent'?'selected':''}>Recent</option>
+      </select>
+    </div>
+
+    ${meals.length === 0 ? `<div class="empty-state card"><div class="text-3 small">No meals match "${esc(state.savedMealsSearch)}".</div></div>` : `
     <div class="space-y-2">
-      ${state.savedMeals.map(m => {
+      ${meals.map(m => {
         const totals = m.items.reduce((a, f) => ({
           cal: a.cal + (f.calories || 0), p: a.p + (f.protein || 0), c: a.c + (f.carbs || 0), f: a.f + (f.fat || 0),
         }), { cal: 0, p: 0, c: 0, f: 0 });
         const cat = m.category ? CATEGORIES[m.category] : null;
+        const uses = m.usageCount || 0;
         return `
           <div class="card tight">
             <div class="row between mb-2">
@@ -1384,6 +1418,7 @@ function renderSavedMealsSection() {
                 <div class="row" style="gap:8px;align-items:center">
                   ${cat ? `<div class="cat-dot" style="background:${cat.color}"></div>` : ''}
                   <div style="font-weight:600;font-size:14px">${esc(m.name)}</div>
+                  ${uses > 0 ? `<span class="tiny text-3">${uses}×</span>` : ''}
                 </div>
                 <div class="result-sub mt-1">${m.items.length} item${m.items.length !== 1 ? 's' : ''} · <span class="lime">${totals.cal}</span> cal · P${totals.p} C${totals.c} F${totals.f}</div>
               </div>
@@ -1395,7 +1430,7 @@ function renderSavedMealsSection() {
           </div>
         `;
       }).join('')}
-    </div>
+    </div>`}
     <button class="btn btn-secondary mt-3" style="width:100%" onclick="openMealBuilder()">${icon('plus', 16)} New saved meal</button>
   `;
 }
@@ -2743,6 +2778,9 @@ async function logSavedMeal(id) {
   for (const item of m.items) {
     await addFoodEntry({ ...item, category: cat });
   }
+  // Track usage frequency
+  state.savedMeals = state.savedMeals.map(x => x.id === id ? { ...x, usageCount: (x.usageCount||0) + 1 } : x);
+  cloudSaveData(state.user.id, 'savedMeals', state.savedMeals).catch(() => {});
 }
 
 // =====================
