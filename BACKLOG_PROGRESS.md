@@ -28,10 +28,10 @@ Format: `- [x] Tier N item N: description — commit <sha> — YYYY-MM-DD`
 
 ## Tier 3
 
-- [ ] Item 1: barcode scanner
-- [ ] Item 2: recipe import from URL (real fetching)
-- [ ] Item 3: smarter category inference
-- [ ] Item 4: bulk-add saved meal grouping
+- [x] Item 1: barcode scanner — commit 509d18b — 2026-04-21
+- [x] Item 2: recipe import from URL (real fetching) — commit 716508b — 2026-04-21
+- [x] Item 3: smarter category inference — commit 2bbf588 — 2026-04-21
+- [x] Item 4: bulk-add saved meal grouping — commit 796ba81 — 2026-04-21
 
 ## Tier 4
 
