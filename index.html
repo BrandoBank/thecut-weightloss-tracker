@@ -3692,7 +3692,8 @@ async function saveSettings() {
     btn.innerHTML = '✓ Saved';
     setTimeout(() => { btn.innerHTML = orig; }, 1200);
   }
-  try { await cloudSaveSettings(state.user.id, state.settings); }
+  // Include apiKey in cloud settings so it survives localStorage wipes
+  try { await cloudSaveSettings(state.user.id, { ...state.settings, _apiKey: state.apiKey }); }
   catch (e) { toast('Save failed: ' + e.message, 'error'); }
 }
 
@@ -3865,7 +3866,11 @@ async function onSignedIn() {
   render();
   try {
     const all = await cloudLoadAll(state.user.id);
-    if (all.settings) state.settings = { ...DEFAULT_SETTINGS, ...all.settings };
+    if (all.settings) {
+      const { _apiKey, ...cleanSettings } = all.settings;
+      state.settings = { ...DEFAULT_SETTINGS, ...cleanSettings };
+      if (_apiKey && !state.apiKey) { state.apiKey = _apiKey; save('apiKey', _apiKey); }
+    }
     if (state.settings.accentColor) applyAccentColor(state.settings.accentColor);
   scheduleNotifications();
     state.weights = all.weights || [];
