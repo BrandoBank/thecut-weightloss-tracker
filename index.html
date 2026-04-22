@@ -889,13 +889,13 @@ function renderApp() {
     </nav>
 
     <div class="body">
-      \${!state.isOnline ? `
+      ${!state.isOnline ? `
         <div class="banner banner-warn mb-3" style="position:sticky;top:0;z-index:50;border-radius:0;margin:0 -16px;padding:10px 16px">
-          \${icon('zap', 13, '#fb923c')}
+          ${icon('zap', 13, '#fb923c')}
           <div style="flex:1">Offline — changes will sync when reconnected</div>
         </div>
       ` : ''}
-      \${state.migrationPrompt ? `
+      ${state.migrationPrompt ? `
         <div class="banner banner-success mb-4">
           ${icon('sparkles', 14, '#c4ff3f')}
           <div style="flex:1">Local data found. Import to cloud?</div>
