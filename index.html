@@ -745,7 +745,7 @@ function _computeInternal() {
   const cutoff14 = new Date(); cutoff14.setDate(cutoff14.getDate() - 14);
   const cutoff14Key = cutoff14.toISOString().slice(0, 10);
   const weights14 = state.weights.filter(w => w.date >= cutoff14Key).sort((a, b) => a.date.localeCompare(b.date));
-  let goalEta = null;
+  let goalEta = null, lbsPerWeek = null, daysToGoal = null, trendSlope = null;
   if (weights14.length >= 4) {
     // Least-squares slope (lbs/day)
     const n = weights14.length;
@@ -755,15 +755,37 @@ function _computeInternal() {
     const yMean = ys.reduce((a, y) => a + y, 0) / n;
     const slope = xs.reduce((a, x, i) => a + (x - xMean) * (ys[i] - yMean), 0) /
                   xs.reduce((a, x) => a + (x - xMean) ** 2, 0);
+    trendSlope = slope;
+    lbsPerWeek = +(slope * 7).toFixed(2);
     if (slope < -0.01) { // losing weight
-      const daysToGoal = Math.round((cw - state.settings.goalWeight) / Math.abs(slope));
+      daysToGoal = Math.round((cw - state.settings.goalWeight) / Math.abs(slope));
       const eta = new Date();
       eta.setDate(eta.getDate() + daysToGoal);
       goalEta = eta.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     }
   }
 
-  return { totals: t, burned, netCalories, currentWeight: cw, lost, toGoal, inPlateau, remaining, progressPct, weeklyAvg, streak, readiness, goalEta };
+  // Calorie-based projection: estimate lbs/week from recent avg calorie deficit
+  let calProjectedEta = null, calLbsPerWeek = null;
+  const recentLog = state.weeklyCache.filter(d => d.logCount > 0).slice(-14);
+  if (recentLog.length >= 3) {
+    const avgCals = recentLog.reduce((a, d) => a + (d.cals || 0), 0) / recentLog.length;
+    const dailyDeficit = state.settings.calorieTarget - avgCals; // negative = over, positive = under
+    // ~3500 cal deficit = 1 lb
+    const calPerDayToLose = (avgCals - (state.settings.tdee || state.settings.calorieTarget + 500));
+    // Simpler: use logged cals vs a TDEE estimate. Assume TDEE ≈ calorieTarget + 500 (standard cut assumption)
+    const estimatedTdee = (state.settings.tdee || state.settings.calorieTarget + 500);
+    const dailyCalDeficit = estimatedTdee - avgCals; // positive = deficit (losing)
+    if (dailyCalDeficit > 50) {
+      calLbsPerWeek = +((dailyCalDeficit * 7) / 3500).toFixed(2);
+      const calDaysToGoal = Math.round((cw - state.settings.goalWeight) / (dailyCalDeficit / 3500));
+      const calEta = new Date();
+      calEta.setDate(calEta.getDate() + calDaysToGoal);
+      calProjectedEta = calEta.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    }
+  }
+
+  return { totals: t, burned, netCalories, currentWeight: cw, lost, toGoal, inPlateau, remaining, progressPct, weeklyAvg, streak, readiness, goalEta, lbsPerWeek, daysToGoal, trendSlope, calProjectedEta, calLbsPerWeek };
 }
 
 // =====================
@@ -1601,6 +1623,80 @@ function renderWeightTab(c) {
         <div class="stat-tile-value lime">${c.streak}<span class="unit">days</span></div>
       </div>
     </div>
+
+    <!-- Projections -->
+    ${(()=>{
+      const hasData = c.lbsPerWeek !== null || c.calProjectedEta;
+      if (!hasData) return `
+        <div class="card mb-3">
+          <div class="card-title mb-2">Projections</div>
+          <div class="small text-3">Log at least 4 weights over 2 weeks to unlock your goal projection.</div>
+        </div>
+      `;
+      const pace = c.lbsPerWeek;
+      const paceAbs = pace !== null ? Math.abs(pace) : null;
+      const isLosing = pace !== null && pace < 0;
+      const isGaining = pace !== null && pace > 0.05;
+      const paceColor = isLosing ? 'var(--lime)' : isGaining ? '#f87171' : '#fb923c';
+      const paceLabel = isLosing ? 'losing' : isGaining ? 'gaining' : 'holding';
+      // Progress arc: how close is pace to ideal 1-2 lb/week?
+      const idealMin = 0.5, idealMax = 2.0;
+      const paceScore = paceAbs !== null ? Math.min(paceAbs / idealMax, 1) : 0;
+      return `
+        <div class="card mb-3">
+          <div class="card-title mb-3">Projections</div>
+
+          ${c.goalEta ? `
+            <!-- Primary ETA -->
+            <div style="background:var(--surface-2);border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid var(--surface-3)">
+              <div class="tiny mb-1" style="color:#737373;letter-spacing:0.06em">GOAL DATE · WEIGHT TREND</div>
+              <div style="font-size:26px;font-weight:700;color:var(--lime);line-height:1.1">${c.goalEta}</div>
+              <div class="small text-3 mt-1">${c.daysToGoal} days · ${c.toGoal} lbs to go</div>
+            </div>
+          ` : c.trendSlope !== null && c.trendSlope >= 0 ? `
+            <div style="background:var(--surface-2);border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #f87171;opacity:0.85">
+              <div class="tiny mb-1" style="color:#f87171;letter-spacing:0.06em">TREND WARNING</div>
+              <div class="small" style="color:#f87171">Weight is trending up or flat. Stay in your deficit to start seeing a projection.</div>
+            </div>
+          ` : `
+            <div style="background:var(--surface-2);border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid var(--surface-3)">
+              <div class="tiny mb-1" style="color:#737373">GOAL DATE</div>
+              <div class="small text-3">Need 4+ weigh-ins over 14 days for a trend projection.</div>
+            </div>
+          `}
+
+          <!-- Pace row -->
+          <div class="grid2" style="gap:10px;margin-bottom:12px">
+            <div style="background:var(--surface-2);border-radius:10px;padding:12px">
+              <div class="tiny mb-1" style="color:#737373">CURRENT PACE</div>
+              ${paceAbs !== null ? `
+                <div style="font-size:20px;font-weight:700;color:${paceColor};line-height:1">${paceAbs.toFixed(1)}<span style="font-size:11px;font-weight:400;margin-left:3px">lb/wk</span></div>
+                <div class="tiny mt-1" style="color:${paceColor}">${paceLabel}</div>
+              ` : `<div class="small text-3">Not enough data</div>`}
+            </div>
+            <div style="background:var(--surface-2);border-radius:10px;padding:12px">
+              <div class="tiny mb-1" style="color:#737373">IDEAL RANGE</div>
+              <div style="font-size:20px;font-weight:700;color:#737373;line-height:1">0.5–2<span style="font-size:11px;font-weight:400;margin-left:3px">lb/wk</span></div>
+              <div class="tiny mt-1" style="color:#737373">sustainable</div>
+            </div>
+          </div>
+
+          ${c.calProjectedEta ? `
+            <!-- Cal-based secondary projection -->
+            <div style="background:var(--surface-2);border-radius:10px;padding:12px;border-left:2px solid #60a5fa">
+              <div class="tiny mb-1" style="color:#60a5fa;letter-spacing:0.06em">CALORIE-BASED ESTIMATE</div>
+              <div class="row between" style="align-items:center">
+                <div>
+                  <div style="font-size:15px;font-weight:600;color:var(--text-2)">${c.calProjectedEta}</div>
+                  <div class="tiny text-3 mt-1">~${c.calLbsPerWeek} lb/wk based on avg intake</div>
+                </div>
+                ${icon('zap', 14, '#60a5fa')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    })()}
 
     <!-- Plateau journal -->
     <div class="card mb-3">
