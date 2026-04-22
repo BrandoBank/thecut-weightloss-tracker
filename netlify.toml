@@ -13,21 +13,28 @@
     X-Frame-Options = "DENY"
     # Prevent MIME sniffing
     X-Content-Type-Options = "nosniff"
-    # Enforce HTTPS for 1 year, include subdomains
+    # Enforce HTTPS for 1 year, include subdomains, eligible for browser preload list
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
     # Minimal referrer exposure
     Referrer-Policy = "strict-origin-when-cross-origin"
     # Disable browser features the app doesn't use
     Permissions-Policy = "camera=(), microphone=(self), geolocation=(), payment=(), usb=(), bluetooth=(), interest-cohort=()"
+    # Isolate browsing context — prevents cross-origin window attacks, enables SharedArrayBuffer
+    Cross-Origin-Opener-Policy = "same-origin"
+    # Require explicit CORP on all subresources — pairs with COOP for full Spectre isolation
+    Cross-Origin-Embedder-Policy = "require-corp"
+    # Prevent other origins from embedding this site's resources
+    Cross-Origin-Resource-Policy = "same-origin"
     # Content Security Policy
     # - default-src self only
-    # - scripts: self + jsdelivr CDN (pinned to supabase-js@2)
+    # - scripts: self + jsdelivr CDN (SRI-pinned supabase-js)
     # - connect: self + Supabase + Anthropic API + Open Food Facts
-    # - img: self + data URIs (embedded bee logos) + blob (camera frames)
+    # - img: self + data URIs (embedded logos) + blob (camera frames)
     # - style: self + unsafe-inline (required for inline styles in vanilla JS app)
     # - worker: self (service worker)
     # - frame-ancestors: none (belt-and-suspenders with X-Frame-Options)
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://api.anthropic.com https://world.openfoodfacts.org; img-src 'self' data: blob:; media-src blob:; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    # - report-uri: CSP violations sent to our logging endpoint
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://api.anthropic.com https://world.openfoodfacts.org; img-src 'self' data: blob:; media-src blob:; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; report-uri /api/csp-report"
 
 # ── API function routes: no caching, tighter headers ─────────────────────────
 [[headers]]
@@ -35,3 +42,5 @@
   [headers.values]
     Cache-Control = "no-store"
     X-Content-Type-Options = "nosniff"
+    # API responses should never be embedded by other origins
+    Cross-Origin-Resource-Policy = "same-site"

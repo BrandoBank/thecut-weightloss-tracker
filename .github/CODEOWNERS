@@ -1,0 +1,12 @@
+# CODEOWNERS — all changes require review by the repo owner.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: everything
+* @BrandoBank
+
+# Security-sensitive files require explicit owner review
+SECURITY.md                          @BrandoBank
+netlify.toml                         @BrandoBank
+netlify/functions/                   @BrandoBank
+.github/workflows/                   @BrandoBank
+.github/dependabot.yml               @BrandoBank
