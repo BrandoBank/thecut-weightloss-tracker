@@ -5,8 +5,33 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# ── Security headers for all routes ──────────────────────────────────────────
 [[headers]]
   for = "/*"
   [headers.values]
+    # Prevent clickjacking
     X-Frame-Options = "DENY"
+    # Prevent MIME sniffing
+    X-Content-Type-Options = "nosniff"
+    # Enforce HTTPS for 1 year, include subdomains
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    # Minimal referrer exposure
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # Disable browser features the app doesn't use
+    Permissions-Policy = "camera=(), microphone=(self), geolocation=(), payment=(), usb=(), bluetooth=(), interest-cohort=()"
+    # Content Security Policy
+    # - default-src self only
+    # - scripts: self + jsdelivr CDN (pinned to supabase-js@2)
+    # - connect: self + Supabase + Anthropic API + Open Food Facts
+    # - img: self + data URIs (embedded bee logos) + blob (camera frames)
+    # - style: self + unsafe-inline (required for inline styles in vanilla JS app)
+    # - worker: self (service worker)
+    # - frame-ancestors: none (belt-and-suspenders with X-Frame-Options)
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://api.anthropic.com https://world.openfoodfacts.org; img-src 'self' data: blob:; media-src blob:; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+# ── API function routes: no caching, tighter headers ─────────────────────────
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store"
     X-Content-Type-Options = "nosniff"
