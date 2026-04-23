@@ -391,11 +391,16 @@ document.addEventListener('touchend', async () => {
 // =====================
 // Direction is locked on first significant touchmove (>8px) so vertical
 // scrolls never accidentally trigger a tab switch.
-let _swipeStartX = 0, _swipeStartY = 0, _swipeDir = null;
+// _swipeOnNav: gesture that started on the tab bar or any scrollable nav
+// element — those are native scrolls, not tab-switch swipes.
+let _swipeStartX = 0, _swipeStartY = 0, _swipeDir = null, _swipeOnNav = false;
 document.addEventListener('touchstart', e => {
   _swipeStartX = e.touches[0].clientX;
   _swipeStartY = e.touches[0].clientY;
   _swipeDir = null;
+  // Block swipe-to-switch when the touch originates on the tab bar or any
+  // horizontally-scrollable container — those are native scroll gestures.
+  _swipeOnNav = !!(e.target.closest('#tabbar') || e.target.closest('.hscroll'));
 }, { passive: true });
 document.addEventListener('touchmove', e => {
   if (_swipeDir) return; // already locked
@@ -405,7 +410,7 @@ document.addEventListener('touchmove', e => {
   _swipeDir = dx > dy ? 'h' : 'v'; // lock direction
 }, { passive: true });
 document.addEventListener('touchend', e => {
-  if (state.modal || _swipeDir !== 'h') return;
+  if (state.modal || _swipeDir !== 'h' || _swipeOnNav) return;
   const dx = e.changedTouches[0].clientX - _swipeStartX;
   if (Math.abs(dx) < 60) return;
   const allTabs = ['home','log','exercise','weight','meals','kitchen','settings'];
@@ -963,10 +968,21 @@ function render() {
   _renderPending = true;
   requestAnimationFrame(() => {
     _renderPending = false;
-    const active = document.activeElement;
+
+    // Snapshot everything we need to restore BEFORE the DOM is replaced.
+    const active    = document.activeElement;
     const focusedId = active?.id;
-    const selStart = active?.selectionStart;
-    const selEnd = active?.selectionEnd;
+    // Capture the LIVE value of any focused input — this may be ahead of
+    // state if a keystroke arrived in the 16ms between render() and rAF.
+    // Restoring it prevents characters from visually disappearing on mobile.
+    const liveValue = (active && 'value' in active) ? active.value : null;
+    const selStart  = active?.selectionStart;
+    const selEnd    = active?.selectionEnd;
+    // Tab bar scroll position is wiped by setHTML — preserve it so the user's
+    // position in the nav doesn't snap to 0 after every render.
+    const tabbar       = document.getElementById('tabbar');
+    const tabbarScroll = tabbar ? tabbar.scrollLeft : 0;
+
     if (!state.authReady) {
       _tt.setHTML(root, renderBoot());
     } else if (!state.user) {
@@ -976,10 +992,18 @@ function render() {
     } else {
       _tt.setHTML(root, renderApp());
     }
+
+    // Restore tab bar scroll position.
+    const newTabbar = document.getElementById('tabbar');
+    if (newTabbar && tabbarScroll > 0) newTabbar.scrollLeft = tabbarScroll;
+
+    // Restore focus, live value, and cursor position.
     if (focusedId) {
       const el = document.getElementById(focusedId);
       if (el) {
-        el.focus();
+        // Put back any in-flight characters before refocusing.
+        if (liveValue !== null && 'value' in el) el.value = liveValue;
+        el.focus({ preventScroll: true });
         if (selStart != null && typeof el.setSelectionRange === 'function') {
           try { el.setSelectionRange(selStart, selEnd); } catch {}
         }
@@ -1446,7 +1470,7 @@ function renderSearchMode() {
   return `
     <div class="field-wrap">
       <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);z-index:1">${icon('search', 17, '#737373')}</span>
-      <input id="search-input" class="field" type="text" value="${esc(state.searchInput)}" placeholder="Search foods or anything…" oninput="state.searchInput = this.value; debounceRender('search')" onkeydown="if(event.key==='Enter') handleSearch()" style="padding-left:44px" ${state.analyzing ? 'disabled' : ''} autofocus/>
+      <input id="search-input" class="field" type="text" value="${esc(state.searchInput)}" placeholder="Search foods or anything…" oninput="state.searchInput = this.value; debounceRender('search', 300)" onkeydown="if(event.key==='Enter') handleSearch()" style="padding-left:44px" ${state.analyzing ? 'disabled' : ''} autofocus/>
     </div>
 
     ${mineMatches.length > 0 ? `
@@ -2051,7 +2075,7 @@ function renderSavedMealsSection() {
     <div class="row between mb-3" style="gap:8px">
       <div class="field-wrap flex1" style="position:relative;margin:0">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%)">${icon('search', 15, '#737373')}</span>
-        <input id="meals-search-input" class="field" style="padding-left:36px;padding-top:8px;padding-bottom:8px" type="text" value="${esc(state.savedMealsSearch)}" placeholder="Search meals or ingredients…" oninput="state.savedMealsSearch = this.value; debounceRender('mealsSearch')" onkeydown="if(event.key==='Enter') searchRestaurant()"/>
+        <input id="meals-search-input" class="field" style="padding-left:36px;padding-top:8px;padding-bottom:8px" type="text" value="${esc(state.savedMealsSearch)}" placeholder="Search meals or ingredients…" oninput="state.savedMealsSearch = this.value; debounceRender('mealsSearch', 300)" onkeydown="if(event.key==='Enter') searchRestaurant()"/>
         ${state.savedMealsSearch ? `<button onclick="state.savedMealsSearch='';render()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#737373">${icon('x', 14)}</button>` : ''}
       </div>
       ${state.savedMealsSelectMode
@@ -2681,7 +2705,7 @@ function renderMealBuilderModal() {
             <div class="card-title mb-2">Add an item</div>
             <div class="field-wrap">
               <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);z-index:1">${icon('search', 16, '#737373')}</span>
-              <input class="field" type="text" value="${esc(state.mealBuilderSearch)}" placeholder="Search your foods or anything…" oninput="state.mealBuilderSearch = this.value; debounceRender('builderSearch')" style="padding-left:40px"/>
+              <input class="field" type="text" value="${esc(state.mealBuilderSearch)}" placeholder="Search your foods or anything…" oninput="state.mealBuilderSearch = this.value; debounceRender('builderSearch', 300)" style="padding-left:40px"/>
             </div>
 
             ${matches.length > 0 ? `
@@ -4235,15 +4259,18 @@ async function init() {
 
   sb.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session) {
-      // Skip the first SIGNED_IN echo that fires right after init() already
-      // loaded data. Reset the flag so any future re-login works normally.
-      if (_signedInOnce) { _signedInOnce = false; return; }
+      // Skip ALL SIGNED_IN events while already signed in — Supabase fires
+      // this on every token refresh (~hourly) which previously caused a full
+      // data reload and loading-screen flash every hour.
+      // _signedInOnce is only reset on SIGNED_OUT so a real re-login works.
+      if (_signedInOnce) return;
+      _signedInOnce = true;
       state.user = session.user;
       state.authError = '';
       state.authPassword = '';
       await onSignedIn();
     } else if (event === 'SIGNED_OUT') {
-      _signedInOnce = false; // reset so next sign-in goes through
+      _signedInOnce = false; // allow the next real sign-in to load data
       state.user = null;
       state.log = []; state.water = 0; state.exercise = [];
       state.weights = []; state.recents = []; state.exerciseRecents = [];
