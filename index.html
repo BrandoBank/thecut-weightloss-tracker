@@ -2317,19 +2317,19 @@ function renderSettingsTab(c) {
             <!-- Bee icon small -->
             <img src="${BEE_FULL}" style="width:18px;height:18px;object-fit:contain;margin-bottom:1px" alt="bee"/>
             <div style="font-size:7px;color:var(--lime);font-weight:700;letter-spacing:0.08em;text-transform:uppercase">The Cut.</div>
-            <div style="font-size:16px;font-weight:700;color:#fff;line-height:1;margin-top:2px">${computed().totalCals}</div>
+            <div style="font-size:16px;font-weight:700;color:#fff;line-height:1;margin-top:2px">${computed().totals.calories}</div>
             <div style="font-size:7px;color:#737373">of ${state.settings.calorieTarget || 1700} cal</div>
             <!-- Mini macro bar -->
             <div style="display:flex;gap:4px;margin-top:3px">
-              <div style="font-size:6px;color:#60a5fa">P${computed().totalProtein}</div>
+              <div style="font-size:6px;color:#60a5fa">P${computed().totals.protein}</div>
               <div style="font-size:6px;color:#737373">·</div>
-              <div style="font-size:6px;color:#a3e635">C${computed().totalCarbs}</div>
+              <div style="font-size:6px;color:#a3e635">C${computed().totals.carbs}</div>
               <div style="font-size:6px;color:#737373">·</div>
-              <div style="font-size:6px;color:#c084fc">F${computed().totalFat}</div>
+              <div style="font-size:6px;color:#c084fc">F${computed().totals.fat}</div>
             </div>
             <!-- Remaining pill -->
             <div style="margin-top:4px;background:var(--lime);color:#000;font-size:6px;font-weight:700;padding:2px 6px;border-radius:8px">
-              ${Math.max(0, (state.settings.calorieTarget || 1700) - computed().totalCals)} left
+              ${Math.max(0, (state.settings.calorieTarget || 1700) - computed().totals.calories)} left
             </div>
           </div>
         </div>
