@@ -467,7 +467,7 @@ async function startBarcodeScanner() {
         } else {
           _scannerRAF = requestAnimationFrame(tick);
         }
-      }).catch(() => { _scannerRAF = requestAnimationFrame(tick); });
+      }).catch(() => { if (state.scanning) _scannerRAF = requestAnimationFrame(tick); });
     })();
   } catch (e) {
     toast('Camera access denied or unavailable', 'error');
@@ -566,6 +566,18 @@ async function cloudLoadDay(userId, date) {
 }
 async function cloudSaveSettings(uid, s) { await sb.from('user_settings').upsert({ user_id: uid, settings: s }); }
 async function cloudSaveData(uid, k, v) { await sb.from('user_data').upsert({ user_id: uid, key: k, value: v }); }
+
+// Debounced cloud saves for high-frequency arrays — batches rapid successive
+// writes (e.g. logging multiple foods) into a single Supabase upsert.
+const _debouncedSaveTimers = {};
+function _debouncedCloudSave(key, delayMs = 3000) {
+  clearTimeout(_debouncedSaveTimers[key]);
+  _debouncedSaveTimers[key] = setTimeout(() => {
+    if (!state.user) return;
+    const val = state[key];
+    if (val !== undefined) cloudSaveData(state.user.id, key, val).catch(e => console.warn('[thecut] deferred save failed', key, e));
+  }, delayMs);
+}
 async function cloudAddFood(uid, date, entry) {
   const { data, error } = await sb.from('food_log').insert({ user_id: uid, date, entry: { ...entry, id: undefined } }).select('id').single();
   if (error) throw error; return data.id;
@@ -3337,7 +3349,7 @@ async function addFoodEntry(food) {
     const clean = { name: entry.name, calories: entry.calories, protein: entry.protein, carbs: entry.carbs, fat: entry.fat };
     const filtered = state.recents.filter(r => r.name.toLowerCase() !== clean.name.toLowerCase());
     state.recents = [clean, ...filtered].slice(0, 20);
-    await cloudSaveData(state.user.id, 'recents', state.recents);
+    _debouncedCloudSave('recents'); // batches rapid food logs into one write
     refreshWeeklyCache();
     render();
   } catch (e) {
@@ -3486,7 +3498,7 @@ async function addExerciseEntry(ex) {
   try {
     const id = await cloudAddExercise(state.user.id, state.viewDate, entry);
     state.exercise = state.exercise.map(e => e.id === tempId ? { ...e, id } : e);
-    await cloudSaveData(state.user.id, 'exerciseRecents', state.exerciseRecents);
+    _debouncedCloudSave('exerciseRecents'); // batches rapid exercise logs into one write
     refreshWeeklyCache();
     render();
   } catch (e) {
@@ -3662,9 +3674,10 @@ async function logSavedMeal(id) {
   for (const item of m.items) {
     await addFoodEntry({ ...item, category: cat });
   }
-  // Track usage frequency
+  // Track usage frequency — debounced so logging a multi-item meal doesn't
+  // fire one save per item; the final state is written after 3s of quiet.
   state.savedMeals = state.savedMeals.map(x => x.id === id ? { ...x, usageCount: (x.usageCount||0) + 1 } : x);
-  cloudSaveData(state.user.id, 'savedMeals', state.savedMeals).catch(e => console.warn('[thecut] savedMeals sync failed', e));
+  _debouncedCloudSave('savedMeals');
 }
 
 function toggleMealSelect(id) {
