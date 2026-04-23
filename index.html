@@ -829,9 +829,11 @@ let _computedCache = null;
 let _computedHash = '';
 function _stateHash() {
   const l = state.log, e = state.exercise, w = state.weights, wc = state.weeklyCache;
-  // Spot-check: lengths + first/last item calories + editable fields
-  // For log/exercise, also hash total cals so edits (not just adds) are caught
-  const logSig = l.length + '|' + l.reduce((s, f) => s + (f.calories|0), 0);
+  // Single-pass over log: track all four macros so edits that change protein/
+  // carbs/fat without changing calories still invalidate the cache.
+  let lCal = 0, lPro = 0, lCarb = 0, lFat = 0;
+  for (const f of l) { lCal += f.calories|0; lPro += f.protein|0; lCarb += f.carbs|0; lFat += f.fat|0; }
+  const logSig = `${l.length}|${lCal}|${lPro}|${lCarb}|${lFat}`;
   const exSig  = e.length + '|' + e.reduce((s, x) => s + (x.calories|0), 0);
   const wSig   = w.length + '|' + (w[w.length-1]?.weight ?? '');
   const wcSig  = wc.length + '|' + (wc[wc.length-1]?.cals ?? '');
