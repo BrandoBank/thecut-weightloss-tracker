@@ -652,6 +652,9 @@ const state = {
   savedMealsSort: 'frequency',  // 'frequency' | 'alpha' | 'recent'
   savedMealsSelectMode: false,
   savedMealsSelected: [],     // array of meal IDs selected for bulk log
+  restaurantSearching: false,
+  restaurantResults: [],
+  restaurantError: '',
 
   analyzing: false, error: '',
   scanning: false,
@@ -1931,7 +1934,7 @@ function renderSavedMealsSection() {
     <div class="row between mb-3" style="gap:8px">
       <div class="field-wrap flex1" style="position:relative;margin:0">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%)">${icon('search', 15, '#737373')}</span>
-        <input class="field" style="padding-left:36px;padding-top:8px;padding-bottom:8px" type="text" value="${esc(state.savedMealsSearch)}" placeholder="Search meals or ingredients…" oninput="state.savedMealsSearch = this.value; debounceRender('mealsSearch')"/>
+        <input id="meals-search-input" class="field" style="padding-left:36px;padding-top:8px;padding-bottom:8px" type="text" value="${esc(state.savedMealsSearch)}" placeholder="Search meals or ingredients…" oninput="state.savedMealsSearch = this.value; debounceRender('mealsSearch')" onkeydown="if(event.key==='Enter') searchRestaurant()"/>
         ${state.savedMealsSearch ? `<button onclick="state.savedMealsSearch='';render()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#737373">${icon('x', 14)}</button>` : ''}
       </div>
       ${state.savedMealsSelectMode
@@ -1948,7 +1951,39 @@ function renderSavedMealsSection() {
       ${icon('plus', 16, '#000')} Log ${state.savedMealsSelected.length} meal${state.savedMealsSelected.length !== 1 ? 's' : ''}
     </button>` : ''}
 
-    ${meals.length === 0 ? `<div class="empty-state card"><div class="text-3 small">No meals match "${esc(state.savedMealsSearch)}".</div></div>` : `
+    ${state.savedMealsSearch.trim() && !state.savedMealsSelectMode ? `
+      <button class="btn btn-secondary mb-3" style="width:100%" onclick="searchRestaurant()" ${state.restaurantSearching ? 'disabled' : ''}>
+        ${state.restaurantSearching ? `${icon('loader', 15, 'currentColor', 2, 'spin')} Searching…` : `${icon('sparkles', 15)} Search "${esc(state.savedMealsSearch)}" online`}
+      </button>
+    ` : ''}
+
+    ${state.restaurantResults?.length > 0 ? `
+      <div class="card mb-3" style="border-color:var(--surface-3)">
+        <div class="row between mb-3">
+          <div class="card-title">Online Results</div>
+          <button onclick="state.restaurantResults=[];render()" style="color:#737373;padding:4px">${icon('x', 14)}</button>
+        </div>
+        <div class="space-y-2">
+          ${state.restaurantResults.map((r, i) => `
+            <div style="background:var(--surface-2);border-radius:10px;padding:12px">
+              <div class="row between mb-1">
+                <div style="font-weight:600;font-size:14px">${esc(r.name)}</div>
+                <div class="tiny text-3 mono">${r.restaurant ? esc(r.restaurant) : ''}</div>
+              </div>
+              <div class="result-sub mb-2"><span class="lime">${r.calories}</span> cal · P${r.protein}g C${r.carbs}g F${r.fat}g</div>
+              <div class="row" style="gap:6px">
+                <button class="btn btn-secondary" style="flex:1;font-size:12px;padding:8px" onclick="logRestaurantResult(${i})">${icon('plus', 13)} Log</button>
+                <button class="btn btn-primary" style="flex:1;font-size:12px;padding:8px" onclick="saveRestaurantResultAsMeal(${i})">${icon('layers', 13, '#000')} Save meal</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : state.restaurantError ? `
+      <div class="banner banner-warn mb-3">${icon('zap', 13, '#fb923c')}<div style="flex:1">${esc(state.restaurantError)}</div></div>
+    ` : ''}
+
+    ${meals.length === 0 && !state.restaurantResults?.length ? `<div class="empty-state card"><div class="text-3 small">No saved meals match "${esc(state.savedMealsSearch)}". Try searching online above.</div></div>` : meals.length === 0 ? '' : `
     <div class="space-y-2">
       ${meals.map(m => {
         const totals = m.items.reduce((a, f) => ({
@@ -3451,6 +3486,64 @@ async function deleteExercise(id) {
   catch (e) { console.error(e); }
 }
 
+
+// =====================
+// RESTAURANT / ONLINE MEAL SEARCH
+// =====================
+async function searchRestaurant() {
+  const q = state.savedMealsSearch.trim();
+  if (!q || state.restaurantSearching) return;
+  state.restaurantSearching = true;
+  state.restaurantResults = [];
+  state.restaurantError = '';
+  render();
+  try {
+    const results = await callClaude({
+      model: MODEL, max_tokens: 1000,
+      messages: [{ role: 'user', content: `Nutrition lookup: "${q}"\n\nIf this is a restaurant or fast food item (e.g. "Chipotle chicken bowl", "Chick-fil-A spicy deluxe"), return up to 5 common menu item variations with their published nutrition facts. If it's a generic food, return 5 realistic portion options.\n\nFor each item include the restaurant/brand name if applicable.\n\nReturn ONLY a JSON array. Schema: [{"name": string, "restaurant": string or "", "calories": int, "protein": int, "carbs": int, "fat": int}]` }],
+    });
+    state.restaurantResults = extractJSON(results);
+    if (!Array.isArray(state.restaurantResults) || !state.restaurantResults.length) throw new Error('No results found');
+  } catch (e) {
+    state.restaurantError = e.message || 'Search failed — check your API key in Settings';
+    state.restaurantResults = [];
+  } finally {
+    state.restaurantSearching = false;
+    render();
+  }
+}
+
+async function logRestaurantResult(idx) {
+  const r = state.restaurantResults[idx];
+  if (!r) return;
+  const entry = {
+    name: r.restaurant ? `${r.name} (${r.restaurant})` : r.name,
+    calories: r.calories, protein: r.protein, carbs: r.carbs, fat: r.fat,
+    category: inferCategory(new Date().toISOString(), r.name),
+    time: new Date().toISOString(),
+  };
+  await addFoodEntry(entry);
+  toast(`Logged ${r.name}`, 'success');
+}
+
+async function saveRestaurantResultAsMeal(idx) {
+  const r = state.restaurantResults[idx];
+  if (!r) return;
+  const mealName = r.restaurant ? `${r.name} (${r.restaurant})` : r.name;
+  const newMeal = {
+    id: Date.now(),
+    name: mealName,
+    category: inferCategory(new Date().toISOString(), r.name),
+    items: [{ name: mealName, calories: r.calories, protein: r.protein, carbs: r.carbs, fat: r.fat }],
+    usageCount: 0,
+    createdAt: new Date().toISOString(),
+  };
+  state.savedMeals = [...state.savedMeals, newMeal];
+  await cloudSaveData(state.user.id, 'savedMeals', state.savedMeals);
+  state.restaurantResults = state.restaurantResults.filter((_, i) => i !== idx);
+  toast(`"${mealName}" saved to Meals`, 'success');
+  render();
+}
 
 // =====================
 // MEAL BUILDER
