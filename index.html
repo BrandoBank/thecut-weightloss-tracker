@@ -544,7 +544,8 @@ function _renderToastContainer() {
 // CLOUD STORAGE
 // =====================
 async function cloudLoadAll(userId) {
-  const out = { settings: null, weights: [], recents: [], exerciseRecents: [], plateauNotes: [], commitments: {}, photos: [], savedMeals: [], customCondiments: [], savedDayPlans: [], measurements: [] };
+  const out = { settings: null, weights: [], recents: [], exerciseRecents: [], plateauNotes: [], commitments: {}, savedMeals: [], customCondiments: [], savedDayPlans: [], measurements: [] };
+  // photos intentionally excluded — stored in IndexedDB, not Supabase user_data
   // Fetch all three in parallel instead of sequentially
   const [settingsRes, weightsRes, kvRes] = await Promise.all([
     sb.from('user_settings').select('settings').eq('user_id', userId).maybeSingle(),
@@ -578,6 +579,91 @@ function _debouncedCloudSave(key, delayMs = 3000) {
     if (val !== undefined) cloudSaveData(state.user.id, key, val).catch(e => console.warn('[thecut] deferred save failed', key, e));
   }, delayMs);
 }
+// =====================
+// INDEXEDDB — PHOTOS
+// =====================
+// Photos are large (100-300KB each as base64). Storing them in Supabase's
+// user_data JSONB column caused the entire array to be fetched and rewritten
+// on every boot and every upload. IndexedDB is the right tool: persistent,
+// per-browser, no size limit, no network cost, instant reads.
+//
+// Cloud sync across devices is NOT supported for photos (progress photos are
+// typically taken and viewed on the same device). The userId index ensures
+// photos from different accounts on the same browser stay separate.
+const _photoDB = (() => {
+  try {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('thecut-photos', 1);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('photos')) {
+          const store = db.createObjectStore('photos', { keyPath: 'id' });
+          store.createIndex('userId', 'userId', { unique: false });
+        }
+      };
+      req.onsuccess = e => resolve(e.target.result);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) { return Promise.reject(e); }
+})();
+
+async function idbLoadPhotos(userId) {
+  try {
+    const db = await _photoDB;
+    return new Promise(resolve => {
+      const req = db.transaction('photos', 'readonly')
+        .objectStore('photos').index('userId').getAll(userId);
+      req.onsuccess = () => resolve((req.result || []).sort((a, b) => a.date.localeCompare(b.date)));
+      req.onerror = () => resolve([]);
+    });
+  } catch { return []; }
+}
+
+async function idbSavePhoto(photo, userId) {
+  try {
+    const db = await _photoDB;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('photos', 'readwrite');
+      tx.objectStore('photos').put({ ...photo, userId });
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) { console.warn('[thecut] idb photo save failed', e); }
+}
+
+async function idbDeletePhoto(id) {
+  try {
+    const db = await _photoDB;
+    return new Promise(resolve => {
+      const tx = db.transaction('photos', 'readwrite');
+      tx.objectStore('photos').delete(id);
+      tx.oncomplete = resolve;
+      tx.onerror = resolve;
+    });
+  } catch {}
+}
+
+// One-time migration: pull photos out of Supabase user_data, store in IDB,
+// then clear the JSONB column. Runs once per browser (tracked in localStorage).
+async function _migratePhotosToIDB(userId) {
+  if (load('photosMigratedV1', false)) return null;
+  try {
+    const { data } = await sb.from('user_data')
+      .select('value').eq('user_id', userId).eq('key', 'photos').maybeSingle();
+    const supaPhotos = Array.isArray(data?.value) ? data.value : [];
+    if (supaPhotos.length > 0) {
+      for (const p of supaPhotos) await idbSavePhoto(p, userId);
+      // Replace heavy JSONB with empty sentinel so future cloudLoadAll ignores it
+      await cloudSaveData(userId, 'photos', []);
+    }
+    save('photosMigratedV1', true);
+    return supaPhotos.length > 0 ? supaPhotos : null;
+  } catch (e) {
+    console.warn('[thecut] photo migration failed', e);
+    return null;
+  }
+}
+
 async function cloudAddFood(uid, date, entry) {
   const { data, error } = await sb.from('food_log').insert({ user_id: uid, date, entry: { ...entry, id: undefined } }).select('id').single();
   if (error) throw error; return data.id;
@@ -3819,9 +3905,10 @@ async function handlePhotoUpload(file) {
   try {
     const dataUrl = await compressImage(file, 1200, 0.85);
     const photo = { id: Date.now(), date: new Date().toISOString(), dataUrl };
+    await idbSavePhoto(photo, state.user.id); // local only — no Supabase write
     state.photos = [...state.photos, photo];
     render();
-    await cloudSaveData(state.user.id, 'photos', state.photos);
+    toast('Photo saved!', 'success');
   } catch (e) { toast('Upload failed: ' + e.message, 'error'); }
 }
 
@@ -3835,8 +3922,7 @@ async function deletePhoto(id) {
   if (!confirm('Delete this photo?')) return;
   state.photos = state.photos.filter(p => p.id !== id);
   closeModal();
-  try { await cloudSaveData(state.user.id, 'photos', state.photos); }
-  catch (e) { toast('Delete failed: ' + e.message, 'error'); }
+  await idbDeletePhoto(id); // local only — no Supabase write
 }
 
 function togglePhotoCompare(id) {
@@ -3936,10 +4022,13 @@ async function migrateLocalToCloud() {
     }
     const water = load('water', {});
     for (const date of Object.keys(water)) await cloudSaveWater(state.user.id, date, water[date]);
-    for (const k of ['recents', 'exerciseRecents', 'plateauNotes', 'commitments', 'photos', 'savedMeals', 'customCondiments']) {
+    for (const k of ['recents', 'exerciseRecents', 'plateauNotes', 'commitments', 'savedMeals', 'customCondiments']) {
       const v = load(k, null);
       if (v) await cloudSaveData(state.user.id, k, v);
     }
+    // Photos: migrate from localStorage to IndexedDB (not Supabase)
+    const legacyPhotos = load('photos', []);
+    for (const p of legacyPhotos) await idbSavePhoto(p, state.user.id);
     toast('Imported! Reloading…', 'success');
     location.reload();
   } catch (e) { toast('Import failed: ' + e.message, 'error'); }
@@ -4080,7 +4169,13 @@ async function onSignedIn() {
     state.exerciseRecents = all.exerciseRecents || [];
     state.plateauNotes = all.plateauNotes || [];
     state.commitments = all.commitments || {};
-    state.photos = all.photos || [];
+    // Load photos from IndexedDB — instant, no network, no Supabase traffic.
+    // Also runs a one-time migration for users who had photos in Supabase.
+    state.photos = await idbLoadPhotos(state.user.id);
+    if (state.photos.length === 0) {
+      const migrated = await _migratePhotosToIDB(state.user.id);
+      if (migrated?.length) { state.photos = migrated; render(); }
+    }
     state.savedMeals = all.savedMeals || [];
     state.customCondiments = all.customCondiments || [];
     state.savedDayPlans = all.savedDayPlans || [];
