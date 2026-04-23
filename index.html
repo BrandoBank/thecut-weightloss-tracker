@@ -4007,7 +4007,8 @@ async function onSignedIn() {
   state.loadingCloud = true;
   render();
   try {
-    const all = await cloudLoadAll(state.user.id);
+    const cloudTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Cloud load timed out')), 10000));
+    const all = await Promise.race([cloudLoadAll(state.user.id), cloudTimeout]);
     if (all.settings) {
       const { _apiKey, ...cleanSettings } = all.settings;
       state.settings = { ...DEFAULT_SETTINGS, ...cleanSettings };
@@ -4043,12 +4044,31 @@ async function onSignedIn() {
 // INIT
 // =====================
 async function init() {
-  const { data: { session } } = await sb.auth.getSession();
-  state.authReady = true;
-  if (session) {
-    state.user = session.user;
-    await onSignedIn();
-  } else {
+  // Hard safety net — if anything hangs, force past the boot screen after 8s
+  const bootSafety = setTimeout(() => {
+    if (!state.authReady) {
+      state.authReady = true;
+      state.loadingCloud = false;
+      render();
+      toast('Connection slow — please sign in again if needed', 'info');
+    }
+  }, 8000);
+
+  try {
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000));
+    const { data: { session } } = await Promise.race([sb.auth.getSession(), timeout]);
+    clearTimeout(bootSafety);
+    state.authReady = true;
+    if (session) {
+      state.user = session.user;
+      await onSignedIn();
+    } else {
+      render();
+    }
+  } catch {
+    clearTimeout(bootSafety);
+    state.authReady = true;
+    state.loadingCloud = false;
     render();
   }
 
