@@ -725,14 +725,20 @@ function icon(name, size = 16, color = 'currentColor', stroke = 2, cls = '') {
 // =====================
 // COMPUTED
 // =====================
+// computed() memoization — lightweight hash avoids full JSON.stringify on
+// large arrays. Uses lengths + spot-check values that change when data changes.
 let _computedCache = null;
 let _computedHash = '';
 function _stateHash() {
-  // Only hash the fields computed() actually reads
-  return JSON.stringify([
-    state.log, state.exercise, state.water, state.viewDate,
-    state.weights, state.settings, state.weeklyCache,
-  ]);
+  const l = state.log, e = state.exercise, w = state.weights, wc = state.weeklyCache;
+  // Spot-check: lengths + first/last item calories + editable fields
+  // For log/exercise, also hash total cals so edits (not just adds) are caught
+  const logSig = l.length + '|' + l.reduce((s, f) => s + (f.calories|0), 0);
+  const exSig  = e.length + '|' + e.reduce((s, x) => s + (x.calories|0), 0);
+  const wSig   = w.length + '|' + (w[w.length-1]?.weight ?? '');
+  const wcSig  = wc.length + '|' + (wc[wc.length-1]?.cals ?? '');
+  return [logSig, exSig, state.water, state.viewDate, wSig, wcSig,
+    JSON.stringify(state.settings)].join('\x00');
 }
 
 function computed() {
@@ -849,29 +855,37 @@ function ring(value, max, size, stroke, color = 'var(--lime)') {
 // =====================
 // RENDER ROUTER
 // =====================
+// rAF-batched render — collapses rapid synchronous render() calls into one
+// DOM write per frame, eliminating layout thrash on multi-step state changes.
+let _renderPending = false;
 function render() {
-  const active = document.activeElement;
-  const focusedId = active?.id;
-  const selStart = active?.selectionStart;
-  const selEnd = active?.selectionEnd;
-  if (!state.authReady) {
-    _tt.setHTML(root, renderBoot());
-  } else if (!state.user) {
-    _tt.setHTML(root, renderAuth());
-  } else if (state.loadingCloud) {
-    _tt.setHTML(root, renderBoot('Loading your data…'));
-  } else {
-    _tt.setHTML(root, renderApp());
-  }
-  if (focusedId) {
-    const el = document.getElementById(focusedId);
-    if (el) {
-      el.focus();
-      if (selStart != null && typeof el.setSelectionRange === 'function') {
-        try { el.setSelectionRange(selStart, selEnd); } catch {}
+  if (_renderPending) return;
+  _renderPending = true;
+  requestAnimationFrame(() => {
+    _renderPending = false;
+    const active = document.activeElement;
+    const focusedId = active?.id;
+    const selStart = active?.selectionStart;
+    const selEnd = active?.selectionEnd;
+    if (!state.authReady) {
+      _tt.setHTML(root, renderBoot());
+    } else if (!state.user) {
+      _tt.setHTML(root, renderAuth());
+    } else if (state.loadingCloud) {
+      _tt.setHTML(root, renderBoot('Loading your data…'));
+    } else {
+      _tt.setHTML(root, renderApp());
+    }
+    if (focusedId) {
+      const el = document.getElementById(focusedId);
+      if (el) {
+        el.focus();
+        if (selStart != null && typeof el.setSelectionRange === 'function') {
+          try { el.setSelectionRange(selStart, selEnd); } catch {}
+        }
       }
     }
-  }
+  });
 }
 
 function renderBoot(msg) {
@@ -3975,9 +3989,31 @@ async function handleUrlParams() {
 }
 
 // =====================
-// WEEKLY CACHE (for streak)
+// WEEKLY CACHE (for streak, projections, calorie history)
 // =====================
-async function refreshWeeklyCache() {
+// Immediately patch the cache entry for the current viewDate from in-memory
+// state.log + state.exercise. Zero network cost, makes streak/charts instant.
+function _patchWeeklyCacheLocal() {
+  const date = state.viewDate;
+  const dayCals  = state.log.reduce((s, f) => s + (f.calories || 0), 0);
+  const dayBurned = state.exercise.reduce((s, x) => s + (x.calories || 0), 0);
+  const logCount = state.log.length;
+  const entry = { date, cals: dayCals - dayBurned, burned: dayBurned, logCount };
+  const idx = state.weeklyCache.findIndex(d => d.date === date);
+  if (idx >= 0) {
+    // Replace in place without creating a full new array for the common case
+    const next = state.weeklyCache.slice();
+    next[idx] = entry;
+    state.weeklyCache = next;
+  } else if (logCount > 0 || dayBurned > 0) {
+    state.weeklyCache = [...state.weeklyCache, entry]
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+}
+
+// Full DB sync — expensive (2 Supabase queries, 365 days), debounced 5s
+let _weeklyCacheTimer = null;
+async function _refreshWeeklyCacheFromDB() {
   if (!state.user) return;
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 365);
@@ -3997,10 +4033,17 @@ async function refreshWeeklyCache() {
       byDate[r.date] = byDate[r.date] || { date: r.date, cals: 0, burned: 0, logCount: 0 };
       byDate[r.date].burned += r.entry?.calories || 0;
     }
-    // Apply burned offset to net cals
     for (const d of Object.values(byDate)) d.cals = d.cals - d.burned;
     state.weeklyCache = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+    render(); // update streak/projections with authoritative data
   } catch (e) { console.error('weekly cache failed', e); }
+}
+
+// Public entry point: instant local patch + lazily-scheduled DB reconcile
+function refreshWeeklyCache() {
+  _patchWeeklyCacheLocal();
+  clearTimeout(_weeklyCacheTimer);
+  _weeklyCacheTimer = setTimeout(_refreshWeeklyCacheFromDB, 5000);
 }
 
 // =====================
@@ -4015,7 +4058,7 @@ async function onSignedIn() {
     if (all.settings) {
       const { _apiKey, ...cleanSettings } = all.settings;
       state.settings = { ...DEFAULT_SETTINGS, ...cleanSettings };
-      if (_apiKey && !state.apiKey) { state.apiKey = _apiKey; save('apiKey', _apiKey); }
+      if (_apiKey) { state.apiKey = _apiKey; save('apiKey', _apiKey); } // always trust cloud
     }
     if (state.settings.accentColor) applyAccentColor(state.settings.accentColor);
   scheduleNotifications();
