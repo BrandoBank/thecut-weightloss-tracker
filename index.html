@@ -545,12 +545,15 @@ function _renderToastContainer() {
 // =====================
 async function cloudLoadAll(userId) {
   const out = { settings: null, weights: [], recents: [], exerciseRecents: [], plateauNotes: [], commitments: {}, photos: [], savedMeals: [], customCondiments: [], savedDayPlans: [], measurements: [] };
-  const { data: settingsRow } = await sb.from('user_settings').select('settings').eq('user_id', userId).maybeSingle();
-  if (settingsRow) out.settings = settingsRow.settings;
-  const { data: weights } = await sb.from('weights').select('date, weight').eq('user_id', userId).order('date');
-  out.weights = weights || [];
-  const { data: kv } = await sb.from('user_data').select('key, value').eq('user_id', userId);
-  if (kv) for (const row of kv) if (row.key in out) out[row.key] = row.value;
+  // Fetch all three in parallel instead of sequentially
+  const [settingsRes, weightsRes, kvRes] = await Promise.all([
+    sb.from('user_settings').select('settings').eq('user_id', userId).maybeSingle(),
+    sb.from('weights').select('date, weight').eq('user_id', userId).order('date'),
+    sb.from('user_data').select('key, value').eq('user_id', userId),
+  ]);
+  if (settingsRes.data) out.settings = settingsRes.data.settings;
+  out.weights = weightsRes.data || [];
+  if (kvRes.data) for (const row of kvRes.data) if (row.key in out) out[row.key] = row.value;
   return out;
 }
 async function cloudLoadDay(userId, date) {
@@ -4043,6 +4046,10 @@ async function onSignedIn() {
 // =====================
 // INIT
 // =====================
+// Guards against onAuthStateChange firing SIGNED_IN immediately after init()
+// already called onSignedIn() — token refreshes fire this event repeatedly.
+let _signedInOnce = false;
+
 async function init() {
   // Hard safety net — if anything hangs, force past the boot screen after 8s
   const bootSafety = setTimeout(() => {
@@ -4061,6 +4068,7 @@ async function init() {
     state.authReady = true;
     if (session) {
       state.user = session.user;
+      _signedInOnce = true; // mark so onAuthStateChange skips the redundant echo
       await onSignedIn();
     } else {
       render();
@@ -4074,11 +4082,15 @@ async function init() {
 
   sb.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session) {
+      // Skip the first SIGNED_IN echo that fires right after init() already
+      // loaded data. Reset the flag so any future re-login works normally.
+      if (_signedInOnce) { _signedInOnce = false; return; }
       state.user = session.user;
       state.authError = '';
       state.authPassword = '';
       await onSignedIn();
     } else if (event === 'SIGNED_OUT') {
+      _signedInOnce = false; // reset so next sign-in goes through
       state.user = null;
       state.log = []; state.water = 0; state.exercise = [];
       state.weights = []; state.recents = []; state.exerciseRecents = [];
