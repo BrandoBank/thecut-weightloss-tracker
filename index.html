@@ -549,7 +549,7 @@ function _renderToastContainer() {
 // CLOUD STORAGE
 // =====================
 async function cloudLoadAll(userId) {
-  const out = { settings: null, weights: [], recents: [], exerciseRecents: [], plateauNotes: [], commitments: {}, savedMeals: [], customCondiments: [], savedDayPlans: [], measurements: [] };
+  const out = { settings: null, weights: [], recents: [], exerciseRecents: [], plateauNotes: [], commitments: {}, savedMeals: [], customCondiments: [], savedDayPlans: [], measurements: [], apiKey: '' };
   // photos intentionally excluded — stored in IndexedDB, not Supabase user_data
   // Fetch all three in parallel instead of sequentially
   const [settingsRes, weightsRes, kvRes] = await Promise.all([
@@ -3985,9 +3985,15 @@ async function saveSettings() {
     btn.innerHTML = '✓ Saved';
     setTimeout(() => { btn.innerHTML = orig; }, 1200);
   }
-  // Include apiKey in cloud settings so it survives localStorage wipes
-  try { await cloudSaveSettings(state.user.id, { ...state.settings, _apiKey: state.apiKey }); }
-  catch (e) { toast('Save failed: ' + e.message, 'error'); }
+  // Save API key in two places for maximum durability:
+  //   1. Embedded in user_settings (backwards compat)
+  //   2. Standalone user_data row — survives settings overwrites / localStorage wipes
+  try {
+    await Promise.all([
+      cloudSaveSettings(state.user.id, { ...state.settings, _apiKey: state.apiKey }),
+      cloudSaveData(state.user.id, 'apiKey', state.apiKey),
+    ]);
+  } catch (e) { toast('Save failed: ' + e.message, 'error'); }
 }
 
 
@@ -4199,7 +4205,12 @@ async function onSignedIn() {
     if (all.settings) {
       const { _apiKey, ...cleanSettings } = all.settings;
       state.settings = { ...DEFAULT_SETTINGS, ...cleanSettings };
-      if (_apiKey) { state.apiKey = _apiKey; save('apiKey', _apiKey); } // always trust cloud
+      // Resolve API key: prefer dedicated user_data row; fall back to _apiKey embedded in settings
+      const resolvedKey = all.apiKey || _apiKey || '';
+      if (resolvedKey) { state.apiKey = resolvedKey; save('apiKey', resolvedKey); }
+    } else {
+      // No settings record yet — still try the standalone user_data key
+      if (all.apiKey) { state.apiKey = all.apiKey; save('apiKey', all.apiKey); }
     }
     if (state.settings.accentColor) applyAccentColor(state.settings.accentColor);
   scheduleNotifications();
