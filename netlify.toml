@@ -35,7 +35,7 @@
     # - worker: self (service worker)
     # - frame-ancestors: none (belt-and-suspenders with X-Frame-Options)
     # - report-uri: CSP violations sent to our logging endpoint
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://api.anthropic.com https://world.openfoodfacts.org; img-src 'self' data: blob:; media-src blob:; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; report-uri /api/csp-report"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://api.anthropic.com https://world.openfoodfacts.org; img-src 'self' data: blob:; media-src blob:; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; report-uri /api/csp-report"
 
 # ── API function routes: no caching, tighter headers ─────────────────────────
 [[headers]]

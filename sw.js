@@ -1,8 +1,8 @@
 // The Cut. — Service Worker
 // Offline-first for the app shell; network-first for all API/data calls.
 
-const CACHE = 'thecut-v4';
-const SHELL = ['/'];
+const CACHE = 'thecut-v5';
+const SHELL = ['/', '/supabase.js'];
 
 // ── Install: cache the app shell ──────────────────────────────────────────────
 self.addEventListener('install', e => {
