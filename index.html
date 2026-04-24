@@ -2404,8 +2404,6 @@ function renderSettingsTab(c) {
       </div>
     </div>
 
-    <button class="btn btn-primary" style="width:100%" onclick="saveSettings()">${icon('check', 18, '#000')} Save settings</button>
-
     <!-- Meal Reminders -->
     <div class="card mb-4">
       <div class="card-title mb-3">Meal Reminders</div>
@@ -2488,7 +2486,12 @@ function renderSettingsTab(c) {
       </button>
     </div>
 
-    <div class="text-3 small mt-4" style="text-align:center">The Cut. v2.0 · Built with care</div>
+    <div class="text-3 small mt-4 mb-5" style="text-align:center">The Cut. v2.0 · Built with care</div>
+
+    <!-- Sticky save bar — always visible at bottom of screen -->
+    <div style="position:sticky;bottom:0;left:0;right:0;padding:12px 0 max(12px, env(safe-area-inset-bottom));background:linear-gradient(transparent, #000 24%);z-index:10;margin:0 -20px -20px;padding-left:20px;padding-right:20px">
+      <button class="btn btn-primary" style="width:100%" onclick="saveSettings()">${icon('check', 18, '#000')} Save settings</button>
+    </div>
   `;
 }
 
