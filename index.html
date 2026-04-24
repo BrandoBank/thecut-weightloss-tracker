@@ -4194,7 +4194,7 @@ async function onSignedIn() {
   state.loadingCloud = true;
   render();
   try {
-    const cloudTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Cloud load timed out')), 10000));
+    const cloudTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Cloud load timed out')), 25000));
     const all = await Promise.race([cloudLoadAll(state.user.id), cloudTimeout]);
     if (all.settings) {
       const { _apiKey, ...cleanSettings } = all.settings;
@@ -4228,7 +4228,11 @@ async function onSignedIn() {
     await handleUrlParams();
   } catch (e) {
     state.loadingCloud = false;
-    toast('Failed to load data: ' + e.message, 'error');
+    if (e.message === 'Cloud load timed out') {
+      toast('Slow connection — showing cached data', 'info');
+    } else {
+      toast('Failed to load data: ' + e.message, 'error');
+    }
     render();
   }
 }
