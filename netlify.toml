@@ -19,10 +19,11 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     # Disable browser features the app doesn't use
     Permissions-Policy = "camera=(), microphone=(self), geolocation=(), payment=(), usb=(), bluetooth=(), interest-cohort=()"
-    # Isolate browsing context — prevents cross-origin window attacks, enables SharedArrayBuffer
+    # Isolate browsing context — prevents cross-origin window attacks
     Cross-Origin-Opener-Policy = "same-origin"
-    # Require explicit CORP on all subresources — pairs with COOP for full Spectre isolation
-    Cross-Origin-Embedder-Policy = "require-corp"
+    # NOTE: Cross-Origin-Embedder-Policy require-corp was removed — it blocked the
+    # Supabase SDK on jsdelivr CDN (jsDelivr does not serve CORP headers), causing
+    # a blank page on desktop. The app does not use SharedArrayBuffer so COEP is unnecessary.
     # Prevent other origins from embedding this site's resources
     Cross-Origin-Resource-Policy = "same-origin"
     # Content Security Policy

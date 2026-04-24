@@ -249,6 +249,12 @@ const BEE_FLYING = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABAAAAAQACAYAAA
 // =====================
 const SUPABASE_URL = 'https://ugbwnfbqlreggrpdzfqt.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_UzpQ21aeZ7OcI1u2JMq2Og_ERu4fztD';
+if (!window.supabase) {
+  // SDK failed to load (network error, CDN blocked, etc.) — show visible error instead of blank page
+  document.body.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;padding:24px';
+  document.body.innerHTML = '<div style="font-size:20px;font-weight:700;color:#c4ff3f">The Cut.</div><div style="color:#e5e5e5;text-align:center;font-size:14px;max-width:300px">Could not connect — check your internet connection and reload the page.</div><button onclick="location.reload()" style="margin-top:8px;padding:12px 24px;background:#c4ff3f;color:#000;border:none;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer">Reload</button>';
+  throw new Error('Supabase SDK not loaded — CDN may be blocked or offline');
+}
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, storage: window.localStorage }
 });
