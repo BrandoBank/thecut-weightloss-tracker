@@ -1,7 +1,7 @@
 // The Cut. — Service Worker
 // Offline-first for the app shell; network-first for all API/data calls.
 
-const CACHE = 'thecut-v3';
+const CACHE = 'thecut-v4';
 const SHELL = ['/'];
 
 // ── Install: cache the app shell ──────────────────────────────────────────────
